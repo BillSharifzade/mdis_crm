@@ -19,8 +19,8 @@ services:
       POSTGRES_USER: crm_user
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in prod}"
       POSTGRES_DB: mdis_crm
-    # !reset очищает base-список портов, чтобы не было двойного байнда (0.0.0.0 + 127.0.0.1).
-    ports: !reset
+    # !override заменяет base-список портов целиком, чтобы не было двойного байнда (0.0.0.0 + 127.0.0.1).
+    ports: !override
       - "127.0.0.1:5434:5432"
 
   backend:
