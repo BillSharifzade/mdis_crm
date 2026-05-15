@@ -1,0 +1,790 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "MDIS CRM Backend API",
+        "title": "MDIS CRM API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/api/v1",
+    "paths": {
+        "/analytics/conversion": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Calculates conversion ratios from lead request to signed contract.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Pipeline conversion report",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.ConversionReport"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Real-time stats for leads, total deals, and student intake.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Full CRM dashboard summary",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.DashboardSummary"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/export": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Downloads a formatted file of all leads.",
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Export leads to Excel or PDF",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Format (xlsx, pdf)",
+                        "name": "format",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/kpi": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Review activity (calls) and outcome (success deals) per admissions manager.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Manager performance KPI",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/crm_backend_internal_model.ManagerKPI"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "Authenticate a user with email and password to receive a Bearer token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login and get a JWT token",
+                "parameters": [
+                    {
+                        "description": "Login Request",
+                        "name": "login",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.LoginResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/integrations/telegram/webhook": {
+            "post": {
+                "description": "Inbound endpoint for Telegram Bot updates. Maps chats to Leads.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "integrations"
+                ],
+                "summary": "Telegram Webhook",
+                "parameters": [
+                    {
+                        "description": "Telegram Update",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.TelegramWebhookRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/integrations/telephony/webhook": {
+            "post": {
+                "description": "Endpoint for cloud telephony event logs (calls, recordings).",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "integrations"
+                ],
+                "summary": "Telephony Webhook",
+                "parameters": [
+                    {
+                        "description": "Call Data",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.TelephonyWebhookRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/interactions": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Log a call, SMS, or message against a lead or deal.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "interactions"
+                ],
+                "summary": "Record a new interaction",
+                "parameters": [
+                    {
+                        "description": "Interaction Data",
+                        "name": "interaction",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.CreateInteractionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.Interaction"
+                        }
+                    }
+                }
+            }
+        },
+        "/interactions/lead/{leadID}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of all calls, messages, and internal notes for a specific lead.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "interactions"
+                ],
+                "summary": "Get interaction history for a lead",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Lead ID",
+                        "name": "leadID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/crm_backend_internal_model.Interaction"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/leads": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get a list of the 100 most recent leads.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leads"
+                ],
+                "summary": "List leads",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/crm_backend_internal_model.Lead"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Creates a new lead from a form submission, automatically linking a contact and opening a deal.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leads"
+                ],
+                "summary": "Create a new lead",
+                "parameters": [
+                    {
+                        "description": "Create Lead Request",
+                        "name": "lead",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.CreateLeadRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.Lead"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/leads/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get detailed information about a single lead.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leads"
+                ],
+                "summary": "Get a lead by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Lead ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/crm_backend_internal_model.Lead"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/leads/{id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Change the pipeline stage ID of an existing lead.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leads"
+                ],
+                "summary": "Update lead status",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Lead ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Status Update Request",
+                        "name": "status",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.updateStatusReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "crm_backend_internal_model.ConversionReport": {
+            "type": "object",
+            "properties": {
+                "conversion_rate": {
+                    "type": "number"
+                },
+                "total_contracts": {
+                    "description": "Etap Dogovor",
+                    "type": "integer"
+                },
+                "total_requests": {
+                    "description": "Etap Zayavka",
+                    "type": "integer"
+                }
+            }
+        },
+        "crm_backend_internal_model.CreateInteractionRequest": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deal_id": {
+                    "type": "integer"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "lead_id": {
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "\"call\", \"sms\", \"email\", \"messenger\", \"manual_note\"",
+                    "type": "string"
+                }
+            }
+        },
+        "crm_backend_internal_model.CreateLeadRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "program_id": {
+                    "type": "integer"
+                },
+                "utm_campaign": {
+                    "type": "string"
+                },
+                "utm_medium": {
+                    "type": "string"
+                },
+                "utm_source": {
+                    "type": "string"
+                }
+            }
+        },
+        "crm_backend_internal_model.DashboardSummary": {
+            "type": "object",
+            "properties": {
+                "total_deals": {
+                    "type": "integer"
+                },
+                "total_in_school": {
+                    "type": "integer"
+                },
+                "total_new_leads": {
+                    "type": "integer"
+                }
+            }
+        },
+        "crm_backend_internal_model.Interaction": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deal_id": {
+                    "type": "integer"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lead_id": {
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "\"call\", \"sms\", \"email\", \"messenger\", \"manual_note\"",
+                    "type": "string"
+                }
+            }
+        },
+        "crm_backend_internal_model.Lead": {
+            "type": "object",
+            "properties": {
+                "assignee_id": {
+                    "type": "integer"
+                },
+                "contact_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "program_id": {
+                    "type": "integer"
+                },
+                "source_id": {
+                    "type": "integer"
+                },
+                "status_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "utm_campaign": {
+                    "type": "string"
+                },
+                "utm_medium": {
+                    "type": "string"
+                },
+                "utm_source": {
+                    "type": "string"
+                }
+            }
+        },
+        "crm_backend_internal_model.LoginRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "crm_backend_internal_model.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/crm_backend_internal_model.User"
+                }
+            }
+        },
+        "crm_backend_internal_model.ManagerKPI": {
+            "type": "object",
+            "properties": {
+                "calls_count": {
+                    "type": "integer"
+                },
+                "closed_deals": {
+                    "description": "count deals moved to 'Zachislenie'",
+                    "type": "integer"
+                },
+                "manager_id": {
+                    "type": "integer"
+                },
+                "manager_name": {
+                    "type": "string"
+                },
+                "revenue_added": {
+                    "description": "Placeholder if payments are tracked",
+                    "type": "number"
+                }
+            }
+        },
+        "crm_backend_internal_model.TelegramWebhookRequest": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "object",
+                    "properties": {
+                        "chat": {
+                            "type": "object",
+                            "properties": {
+                                "first_name": {
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "type": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "date": {
+                            "type": "integer"
+                        },
+                        "from": {
+                            "type": "object",
+                            "properties": {
+                                "first_name": {
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "is_bot": {
+                                    "type": "boolean"
+                                },
+                                "language_code": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "message_id": {
+                            "type": "integer"
+                        },
+                        "text": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "update_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "crm_backend_internal_model.TelephonyWebhookRequest": {
+            "type": "object",
+            "properties": {
+                "call_id": {
+                    "type": "string"
+                },
+                "called": {
+                    "type": "string"
+                },
+                "caller": {
+                    "description": "Phone number",
+                    "type": "string"
+                },
+                "duration": {
+                    "description": "in seconds",
+                    "type": "integer"
+                },
+                "recording_url": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "e.g. \"answered\", \"missed\"",
+                    "type": "string"
+                }
+            }
+        },
+        "crm_backend_internal_model.User": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api.updateStatusReq": {
+            "type": "object",
+            "properties": {
+                "status_id": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

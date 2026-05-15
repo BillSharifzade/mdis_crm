@@ -1,0 +1,511 @@
+basePath: /api/v1
+definitions:
+  crm_backend_internal_model.ConversionReport:
+    properties:
+      conversion_rate:
+        type: number
+      total_contracts:
+        description: Etap Dogovor
+        type: integer
+      total_requests:
+        description: Etap Zayavka
+        type: integer
+    type: object
+  crm_backend_internal_model.CreateInteractionRequest:
+    properties:
+      content:
+        type: string
+      created_by:
+        type: integer
+      deal_id:
+        type: integer
+      duration_seconds:
+        type: integer
+      lead_id:
+        type: integer
+      type:
+        description: '"call", "sms", "email", "messenger", "manual_note"'
+        type: string
+    type: object
+  crm_backend_internal_model.CreateLeadRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      phone:
+        type: string
+      program_id:
+        type: integer
+      utm_campaign:
+        type: string
+      utm_medium:
+        type: string
+      utm_source:
+        type: string
+    type: object
+  crm_backend_internal_model.DashboardSummary:
+    properties:
+      total_deals:
+        type: integer
+      total_in_school:
+        type: integer
+      total_new_leads:
+        type: integer
+    type: object
+  crm_backend_internal_model.Interaction:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      deal_id:
+        type: integer
+      duration_seconds:
+        type: integer
+      id:
+        type: integer
+      lead_id:
+        type: integer
+      type:
+        description: '"call", "sms", "email", "messenger", "manual_note"'
+        type: string
+    type: object
+  crm_backend_internal_model.Lead:
+    properties:
+      assignee_id:
+        type: integer
+      contact_id:
+        type: integer
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      phone:
+        type: string
+      program_id:
+        type: integer
+      source_id:
+        type: integer
+      status_id:
+        type: integer
+      updated_at:
+        type: string
+      utm_campaign:
+        type: string
+      utm_medium:
+        type: string
+      utm_source:
+        type: string
+    type: object
+  crm_backend_internal_model.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  crm_backend_internal_model.LoginResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/crm_backend_internal_model.User'
+    type: object
+  crm_backend_internal_model.ManagerKPI:
+    properties:
+      calls_count:
+        type: integer
+      closed_deals:
+        description: count deals moved to 'Zachislenie'
+        type: integer
+      manager_id:
+        type: integer
+      manager_name:
+        type: string
+      revenue_added:
+        description: Placeholder if payments are tracked
+        type: number
+    type: object
+  crm_backend_internal_model.TelegramWebhookRequest:
+    properties:
+      message:
+        properties:
+          chat:
+            properties:
+              first_name:
+                type: string
+              id:
+                type: integer
+              type:
+                type: string
+              username:
+                type: string
+            type: object
+          date:
+            type: integer
+          from:
+            properties:
+              first_name:
+                type: string
+              id:
+                type: integer
+              is_bot:
+                type: boolean
+              language_code:
+                type: string
+              username:
+                type: string
+            type: object
+          message_id:
+            type: integer
+          text:
+            type: string
+        type: object
+      update_id:
+        type: integer
+    type: object
+  crm_backend_internal_model.TelephonyWebhookRequest:
+    properties:
+      call_id:
+        type: string
+      called:
+        type: string
+      caller:
+        description: Phone number
+        type: string
+      duration:
+        description: in seconds
+        type: integer
+      recording_url:
+        type: string
+      status:
+        description: e.g. "answered", "missed"
+        type: string
+    type: object
+  crm_backend_internal_model.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      role:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  internal_api.updateStatusReq:
+    properties:
+      status_id:
+        example: 2
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: MDIS CRM Backend API
+  title: MDIS CRM API
+  version: "1.0"
+paths:
+  /analytics/conversion:
+    get:
+      description: Calculates conversion ratios from lead request to signed contract.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/crm_backend_internal_model.ConversionReport'
+      security:
+      - Bearer: []
+      summary: Pipeline conversion report
+      tags:
+      - analytics
+  /analytics/dashboard:
+    get:
+      description: Real-time stats for leads, total deals, and student intake.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/crm_backend_internal_model.DashboardSummary'
+      security:
+      - Bearer: []
+      summary: Full CRM dashboard summary
+      tags:
+      - analytics
+  /analytics/export:
+    get:
+      description: Downloads a formatted file of all leads.
+      parameters:
+      - description: Format (xlsx, pdf)
+        in: query
+        name: format
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      security:
+      - Bearer: []
+      summary: Export leads to Excel or PDF
+      tags:
+      - analytics
+  /analytics/kpi:
+    get:
+      description: Review activity (calls) and outcome (success deals) per admissions
+        manager.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/crm_backend_internal_model.ManagerKPI'
+            type: array
+      security:
+      - Bearer: []
+      summary: Manager performance KPI
+      tags:
+      - analytics
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate a user with email and password to receive a Bearer
+        token.
+      parameters:
+      - description: Login Request
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/crm_backend_internal_model.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/crm_backend_internal_model.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login and get a JWT token
+      tags:
+      - auth
+  /integrations/telegram/webhook:
+    post:
+      consumes:
+      - application/json
+      description: Inbound endpoint for Telegram Bot updates. Maps chats to Leads.
+      parameters:
+      - description: Telegram Update
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/crm_backend_internal_model.TelegramWebhookRequest'
+      responses:
+        "200":
+          description: OK
+      summary: Telegram Webhook
+      tags:
+      - integrations
+  /integrations/telephony/webhook:
+    post:
+      consumes:
+      - application/json
+      description: Endpoint for cloud telephony event logs (calls, recordings).
+      parameters:
+      - description: Call Data
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/crm_backend_internal_model.TelephonyWebhookRequest'
+      responses:
+        "200":
+          description: OK
+      summary: Telephony Webhook
+      tags:
+      - integrations
+  /interactions:
+    post:
+      consumes:
+      - application/json
+      description: Log a call, SMS, or message against a lead or deal.
+      parameters:
+      - description: Interaction Data
+        in: body
+        name: interaction
+        required: true
+        schema:
+          $ref: '#/definitions/crm_backend_internal_model.CreateInteractionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/crm_backend_internal_model.Interaction'
+      security:
+      - Bearer: []
+      summary: Record a new interaction
+      tags:
+      - interactions
+  /interactions/lead/{leadID}:
+    get:
+      description: Retrieve a list of all calls, messages, and internal notes for
+        a specific lead.
+      parameters:
+      - description: Lead ID
+        in: path
+        name: leadID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/crm_backend_internal_model.Interaction'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get interaction history for a lead
+      tags:
+      - interactions
+  /leads:
+    get:
+      description: Get a list of the 100 most recent leads.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/crm_backend_internal_model.Lead'
+            type: array
+      security:
+      - Bearer: []
+      summary: List leads
+      tags:
+      - leads
+    post:
+      consumes:
+      - application/json
+      description: Creates a new lead from a form submission, automatically linking
+        a contact and opening a deal.
+      parameters:
+      - description: Create Lead Request
+        in: body
+        name: lead
+        required: true
+        schema:
+          $ref: '#/definitions/crm_backend_internal_model.CreateLeadRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/crm_backend_internal_model.Lead'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new lead
+      tags:
+      - leads
+  /leads/{id}:
+    get:
+      description: Get detailed information about a single lead.
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/crm_backend_internal_model.Lead'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get a lead by ID
+      tags:
+      - leads
+  /leads/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Change the pipeline stage ID of an existing lead.
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Status Update Request
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api.updateStatusReq'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Update lead status
+      tags:
+      - leads
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

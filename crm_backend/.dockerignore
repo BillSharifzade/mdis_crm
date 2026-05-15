@@ -1,0 +1,6 @@
+bin/
+server
+.env
+*.log
+.git
+node_modules

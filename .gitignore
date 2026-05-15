@@ -1,0 +1,52 @@
+# ── Environment ──────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Go backend (crm_backend) ─────────────────────────────────
+crm_backend/bin/
+crm_backend/server
+crm_backend/*.exe
+crm_backend/vendor/
+crm_backend/coverage.out
+crm_backend/coverage.html
+
+# ── Node frontend (crm-frontend) ─────────────────────────────
+crm-frontend/node_modules/
+crm-frontend/dist/
+crm-frontend/dist-ssr/
+crm-frontend/.vite/
+crm-frontend/*.local
+
+# Lockfile-debug artifacts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Docker / runtime data ────────────────────────────────────
+.docker/
+pgdata/
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── IDE / Editor ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sw?
+
+# ── OS junk ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Project-specific ────────────────────────────────────────
+# Импортируемые данные клиента — не коммитим PII.
+База лидов_*.xlsx
+*.xlsx
+
+# Claude Code memory / local settings
+.claude/

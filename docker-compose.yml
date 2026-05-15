@@ -1,0 +1,77 @@
+# Полный стек MDIS CRM: Postgres + Go-бэкенд + React-фронт.
+# Запуск одной командой:  docker compose up -d  (или: make up)
+# Миграции применяются автоматически при старте backend (idempotent).
+#
+# Доступы:
+#   Frontend  : http://localhost:5173
+#   Backend   : http://localhost:8082/api/v1
+#   Swagger   : http://localhost:8082/api/v1/swagger/
+#   Postgres  : localhost:5434  (user=crm_user  pass=crm_password  db=mdis_crm)
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: mdis_crm_db
+    environment:
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+      POSTGRES_DB: mdis_crm
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_user -d mdis_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./crm_backend
+    container_name: mdis_crm_api
+    environment:
+      PORT: "8080"
+      DATABASE_URL: "postgres://crm_user:crm_password@db:5432/mdis_crm?sslmode=disable"
+      JWT_SECRET: "${JWT_SECRET:-change_me_in_production}"
+      WEBHOOK_SECRET: "${WEBHOOK_SECRET:-dev_webhook_secret}"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+      # SMTP не обязателен — email будут писаться в лог
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASS: "${SMTP_PASS:-}"
+    ports:
+      - "8082:8080"
+    # Явные публичные DNS — на некоторых хостах докеровский 127.0.0.11
+    # не имеет апстрима и резолв api.telegram.org падает по таймауту.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./crm-frontend
+      args:
+        # API URL виден из браузера — поэтому хостовое имя, не имя сервиса
+        VITE_API_BASE_URL: "http://localhost:8082/api/v1"
+        VITE_USE_API: "true"
+    container_name: mdis_crm_web
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
