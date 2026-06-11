@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"crm_backend/internal/model"
 	"crm_backend/pkg/events"
@@ -39,6 +42,13 @@ type BotSettingsSource interface {
 	Get(ctx context.Context, key, fallback string) string
 }
 
+// SourceLookup отдаёт список источников из справочника. Нужен боту, чтобы
+// привязать создаваемый лид к корректному `source_id` (без этого LeadService
+// падает с FK violation на свежей БД, где базовый id=1 был удалён вручную).
+type SourceLookup interface {
+	ListSources(ctx context.Context, onlyActive bool) ([]model.Source, error)
+}
+
 type TelegramBotService struct {
 	client       *telegram.Client
 	chats        TelegramChatRepo
@@ -48,6 +58,7 @@ type TelegramBotService struct {
 	leadRepo     LeadRepository
 	programRepo  ProgramLookup
 	programList  ProgramListSource
+	sourceLookup SourceLookup
 	botSettings  BotSettingsSource
 	bus          *events.Bus
 }
@@ -61,6 +72,7 @@ func NewTelegramBotService(
 	leadRepo LeadRepository,
 	programRepo ProgramLookup,
 	programList ProgramListSource,
+	sourceLookup SourceLookup,
 	botSettings BotSettingsSource,
 	bus *events.Bus,
 ) *TelegramBotService {
@@ -72,10 +84,96 @@ func NewTelegramBotService(
 		client: client, chats: chats,
 		leadSvc: leadSvc, intSvc: intSvc,
 		contactRepo: contactRepo, leadRepo: leadRepo,
-		programRepo: programRepo,
-		programList: programList,
-		botSettings: botSettings,
-		bus:         bus,
+		programRepo:  programRepo,
+		programList:  programList,
+		sourceLookup: sourceLookup,
+		botSettings:  botSettings,
+		bus:          bus,
+	}
+}
+
+// resolveTelegramSourceID находит id источника для Telegram-лидов в
+// справочнике sources. Приоритет: "Telegram Bot" → "telegram" → nil.
+// При nil вызывающий код просто не выставит SourceID, и LeadService
+// упадёт обратно на дефолт (что может тоже не сработать, если справочник
+// почищен — но это уже отдельная проблема для админа).
+func (s *TelegramBotService) resolveTelegramSourceID(ctx context.Context) *int {
+	if s.sourceLookup == nil {
+		return nil
+	}
+	srcs, err := s.sourceLookup.ListSources(ctx, true)
+	if err != nil {
+		return nil
+	}
+	var fallback *int
+	for _, src := range srcs {
+		if strings.EqualFold(src.Name, "Telegram Bot") {
+			id := src.ID
+			return &id
+		}
+		if fallback == nil && strings.EqualFold(src.Name, "telegram") {
+			id := src.ID
+			fallback = &id
+		}
+	}
+	return fallback
+}
+
+// StartPolling запускает long-polling getUpdates вместо webhook'а.
+// Полезно, когда бэкенд за NAT/без публичного TLS-домена (Telegram
+// блокирует *.trycloudflare.com и подобные). Цикл сам сбрасывает
+// активный webhook (иначе getUpdates получает 409 Conflict) и
+// отдаёт каждое обновление в `process` — обычно это
+// IntegrationService.ProcessTelegramWebhook, тот же путь что и у HTTP-хендлера.
+//
+// Блокирующий: запускать в горутине. Корректно выходит по ctx.Done.
+func (s *TelegramBotService) StartPolling(ctx context.Context, process func(context.Context, *model.TelegramWebhookRequest) error) {
+	if s.client == nil {
+		log.Println("[telegram] bot token not set — polling disabled")
+		return
+	}
+	// getUpdates и активный webhook взаимоисключающи на стороне Telegram.
+	if err := s.client.DeleteWebhook(ctx); err != nil {
+		log.Printf("[telegram] deleteWebhook on start: %v (продолжаем)", err)
+	}
+	log.Println("[telegram] long-polling getUpdates loop started")
+
+	const pollTimeoutSec = 30
+	var offset int
+
+	for {
+		if ctx.Err() != nil {
+			log.Println("[telegram] polling loop stopped")
+			return
+		}
+		updates, err := s.client.GetUpdates(ctx, offset, pollTimeoutSec)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			log.Printf("[telegram] getUpdates: %v", err)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+			continue
+		}
+		for _, raw := range updates {
+			var u model.TelegramWebhookRequest
+			if err := json.Unmarshal(raw, &u); err != nil {
+				log.Printf("[telegram] skipping bad update payload: %v", err)
+				continue
+			}
+			// Advance offset even if processing fails — иначе зависнем на одном
+			// и том же сообщении и заблокируем всю очередь.
+			if u.UpdateID >= offset {
+				offset = u.UpdateID + 1
+			}
+			if err := process(ctx, &u); err != nil {
+				log.Printf("[telegram] process update %d: %v", u.UpdateID, err)
+			}
+		}
 	}
 }
 
@@ -281,6 +379,12 @@ func (s *TelegramBotService) HandleIncoming(ctx context.Context, payload *model.
 			UTMSource:  "telegram",
 			UTMMedium:  "bot",
 			UTMCampaign: "admissions_bot",
+		}
+		// LeadService defaults source_id=1 если SourceID нет, но на проде
+		// id=1 может быть удалён (справочник чистится админом) → FK violation
+		// и лид никогда не создастся. Подставляем явный id "Telegram Bot".
+		if sid := s.resolveTelegramSourceID(ctx); sid != nil {
+			req.SourceID = sid
 		}
 		// Привязываем выбранную программу к лиду, если получится найти id.
 		if s.programRepo != nil && chat.CollectedProgram != "" {

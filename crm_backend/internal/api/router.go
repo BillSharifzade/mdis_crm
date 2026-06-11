@@ -72,8 +72,16 @@ func (r *Router) InitRoutes() http.Handler {
 	leadSvc := service.NewLeadService(leadRepo, contactRepo, dealRepo, userRepo, notificationSvc, statusHistoryRepo, eventBus)
 	interactionSvc := service.NewInteractionService(interactionRepo, eventBus)
 	analyticsSvc := service.NewAnalyticsService(analyticsRepo)
-	botSvc := service.NewTelegramBotService(r.telegramBotToken, tgChatRepo, leadSvc, interactionSvc, contactRepo, leadRepo, programRepo, settingsRepo, botSettingsRepo, eventBus)
+	botSvc := service.NewTelegramBotService(r.telegramBotToken, tgChatRepo, leadSvc, interactionSvc, contactRepo, leadRepo, programRepo, settingsRepo, settingsRepo, botSettingsRepo, eventBus)
 	integrationSvc := service.NewIntegrationService(leadSvc, interactionSvc, contactRepo, leadRepo, botSvc)
+
+	// Long-polling fallback: если бэкенд за NAT и публичного HTTPS-вебхука нет,
+	// бот сам тянет обновления через outbound getUpdates. Webhook-роут ниже
+	// остаётся в живых — Telegram использует ровно один режим за раз и polling
+	// сам сбрасывает любой ранее зарегистрированный webhook на старте.
+	if r.telegramBotToken != "" {
+		go botSvc.StartPolling(context.Background(), integrationSvc.ProcessTelegramWebhook)
+	}
 	exportSvc := service.NewExportService(leadRepo)
 	userSvc := service.NewUserService(userRepo)
 	statusHistorySvc := service.NewStatusHistoryService(statusHistoryRepo)

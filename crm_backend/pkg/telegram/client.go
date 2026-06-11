@@ -118,3 +118,50 @@ func (c *Client) SetWebhook(ctx context.Context, url string) error {
 func (c *Client) DeleteWebhook(ctx context.Context) error {
 	return c.call(ctx, "deleteWebhook", map[string]any{})
 }
+
+// GetUpdates — long-poll Telegram updates. `offset` фильтрует уже
+// обработанные апдейты (передавай last_update_id+1). `timeoutSec` —
+// длина long-poll окна на стороне Telegram (рекомендуется 25–50).
+// Возвращает каждый Update как сырое JSON-сообщение — вызывающий
+// сам распарсит в нужную доменную структуру.
+func (c *Client) GetUpdates(ctx context.Context, offset, timeoutSec int) ([]json.RawMessage, error) {
+	if c.Token == "" {
+		return nil, fmt.Errorf("telegram bot token is empty")
+	}
+	body := map[string]any{
+		"timeout":         timeoutSec,
+		"allowed_updates": []string{"message", "callback_query"},
+	}
+	if offset > 0 {
+		body["offset"] = offset
+	}
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal: %w", err)
+	}
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(buf))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	// HTTP-таймаут должен быть больше long-poll окна, иначе оборвём своё же ожидание.
+	httpClient := &http.Client{Timeout: time.Duration(timeoutSec+15) * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("telegram api: %w", err)
+	}
+	defer resp.Body.Close()
+	var r struct {
+		OK          bool              `json:"ok"`
+		Description string            `json:"description,omitempty"`
+		Result      []json.RawMessage `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	}
+	if !r.OK {
+		return nil, fmt.Errorf("telegram getUpdates: %s", r.Description)
+	}
+	return r.Result, nil
+}

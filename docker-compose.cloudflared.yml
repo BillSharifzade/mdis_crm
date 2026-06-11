@@ -1,0 +1,24 @@
+# Overlay that adds a Cloudflare quick-tunnel container so the Telegram bot
+# webhook is reachable from the public internet without owning a domain or
+# opening firewall ports.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#                  -f docker-compose.cloudflared.yml up -d --build cloudflared
+#
+# Requires TELEGRAM_BOT_TOKEN in the environment / .env file. On every container
+# start the assigned *.trycloudflare.com hostname is re-registered as the bot's
+# webhook automatically.
+
+services:
+  cloudflared:
+    build:
+      context: ./infra/cloudflared
+    container_name: mdis_crm_cloudflared
+    environment:
+      TARGET: "http://backend:8080"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
