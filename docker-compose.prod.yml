@@ -12,6 +12,11 @@
 #   WEBHOOK_SECRET        — секрет для X-Webhook-Secret (телефония)
 #   TELEGRAM_BOT_TOKEN    — токен бота
 #   PUBLIC_API_BASE_URL   — публичный URL API, виден из браузеров (например http://10.10.10.25:8082/api/v1)
+#
+# Опциональные (порты на хосте — переопределяй, если базовые 5173/8082/5434 заняты другими проектами):
+#   WEB_PORT              — публичный порт фронтенда (default 5173)
+#   API_PORT              — публичный порт API   (default 8082)
+#   DB_PORT               — loopback-порт Postgres (default 5434)
 
 services:
   db:
@@ -21,7 +26,7 @@ services:
       POSTGRES_DB: mdis_crm
     # !override заменяет base-список портов целиком, чтобы не было двойного байнда (0.0.0.0 + 127.0.0.1).
     ports: !override
-      - "127.0.0.1:5434:5432"
+      - "127.0.0.1:${DB_PORT:-5434}:5432"
 
   backend:
     environment:
@@ -31,6 +36,8 @@ services:
       WEBHOOK_SECRET: "${WEBHOOK_SECRET:?WEBHOOK_SECRET is required in prod}"
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required in prod}"
       APP_ENV: "production"
+    ports: !override
+      - "${API_PORT:-8082}:8080"
 
   frontend:
     build:
@@ -38,3 +45,5 @@ services:
       args:
         VITE_API_BASE_URL: "${PUBLIC_API_BASE_URL:?PUBLIC_API_BASE_URL is required in prod}"
         VITE_USE_API: "true"
+    ports: !override
+      - "${WEB_PORT:-5173}:80"
