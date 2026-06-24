@@ -184,8 +184,15 @@ function App() {
           const lead = mapServerToClientLead(payload);
           let alreadyKnown = false;
           setAllLeads(prev => {
-            alreadyKnown = prev.some(l => l.id === lead.id);
-            return alreadyKnown ? prev : [lead, ...prev];
+            const idx = prev.findIndex(l => l.id === lead.id);
+            alreadyKnown = idx !== -1;
+            // Merge the fully-hydrated SSE payload over any stub that addLead
+            // may have inserted, so program_name / assignee_id show without a
+            // manual refresh.
+            if (idx === -1) return [lead, ...prev];
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...lead };
+            return next;
           });
           if (!alreadyKnown) {
             pushNotif({ type: 'lead_created', text: `<strong>Новый лид:</strong> ${lead.name}${lead.source ? ' · ' + lead.source : ''}`, leadId: lead.id });
@@ -221,11 +228,19 @@ function App() {
       let created;
       if (USE_API) {
         created = await api.createLead(newLead);
-        setAllLeads(prev => [created, ...prev]);
       } else {
         created = { ...newLead, id: Date.now() };
-        setAllLeads(prev => [created, ...prev]);
       }
+      // Upsert by id: the SSE "lead.created" event may have already inserted
+      // this lead before the POST response resolved. Merge instead of blindly
+      // prepending, otherwise the same lead shows up twice.
+      setAllLeads(prev => {
+        const idx = prev.findIndex(l => l.id === created.id);
+        if (idx === -1) return [created, ...prev];
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...created };
+        return next;
+      });
       showToast(`Лид «${newLead.name}» добавлен`, 'success');
       pushNotif({
         type: 'lead_created',

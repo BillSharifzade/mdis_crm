@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Phone, MessageCircle, Mail, Pencil, Plus, Send, Trash2, Save, Link as LinkIcon } from 'lucide-react';
-import { MANAGER_NAMES, SOURCES, PROGRAMS, getStatusObj, formatHoursAgo } from '../data/crmData';
+import { SOURCES, PROGRAMS, getStatusObj, formatHoursAgo } from '../data/crmData';
 import { api } from '../services/api';
 import TelegramChatModal from './TelegramChatModal';
 import CallModal from './CallModal';
@@ -27,7 +27,7 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
     const { users, byId: usersById } = useUsers();
     const { programs } = usePrograms();
     const assignedUser = usersById.get(lead.assigneeId);
-    const managerLabel = assignedUser?.name || MANAGER_NAMES[lead.managerIdx] || '—';
+    const managerLabel = assignedUser?.name || 'Не назначен';
 
     const [interactions, setInteractions] = useState(lead.interactions || []);
     const [statusHistory, setStatusHistory] = useState([]);

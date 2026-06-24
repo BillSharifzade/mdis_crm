@@ -99,13 +99,15 @@ func (s *LeadService) CreateLeadFromForm(ctx context.Context, req *model.CreateL
 	_ = s.notifications.SendEmail(lead.Email, "Welcome to MDIS", welcomeMsg)
 	_ = s.notifications.SendSMSAlias(lead.Phone, welcomeMsg)
 
-	// Re-fetch so we emit a fully hydrated lead (with program_name etc.)
+	// Re-fetch so both the SSE event AND the HTTP response carry a fully
+	// hydrated lead (with program_name, assignee_id, etc.). Without this the
+	// POST response has an empty program_name and the freshly created lead
+	// shows "—" in the list until a manual refresh.
 	if full, ferr := s.leadRepo.GetByID(ctx, lead.ID); ferr == nil {
 		s.publish("lead.created", full)
-	} else {
-		s.publish("lead.created", lead)
+		return full, nil
 	}
-
+	s.publish("lead.created", lead)
 	return lead, nil
 }
 

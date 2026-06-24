@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { X, Save } from 'lucide-react';
-import { SOURCES, PROGRAMS, MANAGER_NAMES, AVATAR_COLORS, randEl, getInitials } from '../data/crmData';
+import { SOURCES, PROGRAMS, AVATAR_COLORS, randEl, getInitials } from '../data/crmData';
 import { useUsers } from '../context/useUsers';
 import { usePrograms } from '../context/usePrograms';
 
 export default function LeadModal({ onClose, onSave, showToast }) {
     const { users } = useUsers();
     const { programs } = usePrograms();
-    const eligibleManagers = users.filter(u => u.role === 'admin' || u.role === 'admissions');
-    const managerOptions = eligibleManagers.length > 0 ? eligibleManagers : MANAGER_NAMES.map((n, i) => ({ id: -1 - i, name: n }));
+    // Только реальные менеджеры; пусто — значит назначение уйдёт на round-robin.
+    const managerOptions = users.filter(u => u.role === 'admin' || u.role === 'admissions');
     const programOptions = programs.length > 0
         ? programs.map(p => ({ id: p.id, name: p.name }))
         : PROGRAMS.map((name, i) => ({ id: -1 - i, name }));
@@ -17,7 +17,7 @@ export default function LeadModal({ onClose, onSave, showToast }) {
         fio: '', phone: '', email: '',
         source: 'Сайт',
         programId: programOptions[0]?.id ?? null,
-        assigneeId: managerOptions[0]?.id ?? null,
+        assigneeId: null, // по умолчанию — round-robin на бэкенде
         socialUrl: '',
         comment: ''
     });
@@ -48,7 +48,6 @@ export default function LeadModal({ onClose, onSave, showToast }) {
             assigneeId: selectedManager?.id > 0 ? selectedManager.id : null,
             socialUrl: form.socialUrl.trim(),
             status: 'new',
-            managerIdx: Math.max(0, MANAGER_NAMES.indexOf(selectedManager?.name)),
             date: new Date(),
             color: randEl(AVATAR_COLORS),
             interactions: [],

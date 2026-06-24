@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Filter, Plus, X } from 'lucide-react';
-import { MANAGERS, MANAGER_COLORS, SOURCES, MANAGER_NAMES } from '../data/crmData';
+import { SOURCES } from '../data/crmData';
 import { useStages } from '../context/useStages';
 import { useUsers } from '../context/useUsers';
 
@@ -19,15 +19,14 @@ export default function Pipeline({ allLeads, openDetail, openModal, onStatusChan
     const [filterManager, setFilterManager] = useState('');
 
     const managerOptions = users.filter(u => u.role === 'admin' || u.role === 'admissions');
-    const managerNamesList = managerOptions.length > 0 ? managerOptions.map(u => u.name) : MANAGER_NAMES;
+    const managerNamesList = managerOptions.map(u => u.name);
 
     const filteredLeads = useMemo(() => {
         return allLeads.filter(l => {
             if (filterSource && l.source !== filterSource) return false;
             if (filterManager) {
                 const real = usersById.get(l.assigneeId)?.name;
-                const fallback = MANAGER_NAMES[l.managerIdx];
-                if (real !== filterManager && fallback !== filterManager) return false;
+                if (real !== filterManager) return false;
             }
             return true;
         });
@@ -149,7 +148,12 @@ export default function Pipeline({ allLeads, openDetail, openModal, onStatusChan
                                         <div className="kanban-card-program">{l.program}</div>
                                         <div className="kanban-card-footer">
                                             <span className="kanban-card-source">{l.source}</span>
-                                            <div className="kanban-card-avatar" style={{ background: MANAGER_COLORS[l.managerIdx] }}>{MANAGERS[l.managerIdx]}</div>
+                                            {(() => {
+                                                const u = usersById.get(l.assigneeId);
+                                                return (
+                                                    <div className="kanban-card-avatar" style={{ background: u?.color || '#94a3b8' }} title={u?.name || 'Не назначен'}>{u?.initials || '—'}</div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 ))}

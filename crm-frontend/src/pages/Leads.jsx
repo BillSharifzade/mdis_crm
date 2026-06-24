@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Search, Download, Plus, Eye, Phone, MessageCircle, ChevronLeft, ChevronRight, Upload, GitMerge, Trash2, X } from 'lucide-react';
-import { STATUSES, SOURCES, MANAGER_NAMES, MANAGERS, MANAGER_COLORS, getStatusObj, formatDate } from '../data/crmData';
+import { STATUSES, SOURCES, getStatusObj, formatDate } from '../data/crmData';
 import { api } from '../services/api';
 import TelegramChatModal from '../components/TelegramChatModal';
 import CallModal from '../components/CallModal';
@@ -12,11 +12,9 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
     const canEdit = role !== 'guest';
     const canManage = role === 'admin' || role === 'admissions';
     const { users, byId: usersById } = useUsers();
-    // Гостей нельзя назначать менеджерами — исключаем из фильтра
-    const eligibleManagers = users.filter(u => u.role === 'admin' || u.role === 'admissions');
-    const managerOptions = eligibleManagers.length > 0
-        ? eligibleManagers
-        : MANAGER_NAMES.map((n, i) => ({ id: -1 - i, name: n }));
+    // Гостей нельзя назначать менеджерами — исключаем из фильтра.
+    // Никаких выдуманных «запасных» менеджеров: показываем только реальных.
+    const managerOptions = users.filter(u => u.role === 'admin' || u.role === 'admissions');
 
     const [filterStatus, setFilterStatus] = useState('');
     const [filterSource, setFilterSource] = useState('');
@@ -40,8 +38,7 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
             if (filterSource && l.source !== filterSource) return false;
             if (filterManager) {
                 const realName = usersById.get(l.assigneeId)?.name;
-                const fallbackName = MANAGER_NAMES[l.managerIdx];
-                if (realName !== filterManager && fallbackName !== filterManager) return false;
+                if (realName !== filterManager) return false;
             }
             return true;
         });
@@ -222,9 +219,9 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
                                     <td>
                                         {(() => {
                                             const u = usersById.get(l.assigneeId);
-                                            const name = u?.name || MANAGER_NAMES[l.managerIdx] || '—';
-                                            const initials = u?.initials || MANAGERS[l.managerIdx] || '?';
-                                            const color = u?.color || MANAGER_COLORS[l.managerIdx] || '#94a3b8';
+                                            const name = u?.name || 'Не назначен';
+                                            const initials = u?.initials || '—';
+                                            const color = u?.color || '#94a3b8';
                                             return (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                     <div style={{ width: 22, height: 22, borderRadius: 99, background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff' }}>{initials}</div>
