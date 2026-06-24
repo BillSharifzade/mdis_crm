@@ -30,7 +30,7 @@ export default function Login({ onLogin, showToast }) {
 
             <div className="card" style={{ maxWidth: '400px', width: '100%', margin: '0 20px', position: 'relative', zIndex: 10 }}>
                 <div className="card-header" style={{ display: 'block', textAlign: 'center', borderBottom: 'none', paddingBottom: '0' }}>
-                    <img src="/logo-4.png" alt="MDIS Dushanbe" style={{ height: 70, marginBottom: 14, objectFit: 'contain' }} />
+                    <img src={`${import.meta.env.BASE_URL}logo-4.png`} alt="MDIS Dushanbe" style={{ height: 70, marginBottom: 14, objectFit: 'contain' }} />
                     <h2 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Приёмная комиссия</h2>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Введите данные для доступа к CRM</p>
                 </div>

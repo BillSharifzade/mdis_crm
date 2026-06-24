@@ -90,14 +90,34 @@ export const mapServerToClientInteraction = (serverInt) => {
     };
 };
 
+// Единый тип ошибки API: всегда несёт числовой код и человекочитаемое описание.
+// status === 0 — транспортная/сетевая ошибка (DNS, TLS, обрыв соединения, CORS).
+export class ApiError extends Error {
+    constructor(status, message) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+    }
+}
+
 const getAuthHeaders = () => {
     const token = localStorage.getItem('crm_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
+// Обёртка над fetch: сетевые/транспортные сбои превращаем в ApiError(0, ...),
+// чтобы наверх ВСЕГДА уходила ошибка с кодом и описанием — никаких тихих фолбэков.
+const safeFetch = async (url, options) => {
+    try {
+        return await fetch(url, options);
+    } catch (err) {
+        throw new ApiError(0, `Сеть недоступна — ${err?.message || 'не удалось соединиться с сервером'}`);
+    }
+};
+
 const fetchWithAuth = async (endpoint, options = {}) => {
     const headers = { ...options.headers, ...getAuthHeaders() };
-    return fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    return safeFetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
 };
 
 const handleResponse = async (response) => {
@@ -106,9 +126,10 @@ const handleResponse = async (response) => {
             localStorage.removeItem('crm_token');
             localStorage.removeItem('crm_user');
         }
-        let msg = '';
-        try { msg = await response.text(); } catch { /* ignore */ }
-        throw new Error(msg || `HTTP ${response.status}`);
+        let body = '';
+        try { body = (await response.text()).trim(); } catch { /* ignore */ }
+        const desc = body || response.statusText || 'Ошибка запроса';
+        throw new ApiError(response.status, `HTTP ${response.status} — ${desc}`);
     }
     const ct = response.headers.get('content-type') || '';
     if (ct.includes('application/json')) return response.json();
@@ -123,7 +144,7 @@ export const api = {
 
     // --- AUTH ---
     login: async (email, password) => {
-        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        const response = await safeFetch(`${API_BASE_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
@@ -210,7 +231,7 @@ export const api = {
     importLeads: async (file) => {
         const formData = new FormData();
         formData.append('file', file);
-        const response = await fetch(`${API_BASE_URL}/leads/import`, {
+        const response = await safeFetch(`${API_BASE_URL}/leads/import`, {
             method: 'POST',
             headers: { ...getAuthHeaders() },
             body: formData,

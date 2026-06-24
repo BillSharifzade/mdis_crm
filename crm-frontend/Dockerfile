@@ -12,8 +12,12 @@ COPY . .
 # По умолчанию указывает на backend, доступный с хоста (localhost:8082).
 ARG VITE_API_BASE_URL=http://localhost:8082/api/v1
 ARG VITE_USE_API=true
+# VITE_BASE_PATH — публичный суб-путь, под которым раздаётся SPA (например /mdis_crm/).
+# По умолчанию "/" — раздача из корня домена.
+ARG VITE_BASE_PATH=/
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_USE_API=$VITE_USE_API
+ENV VITE_BASE_PATH=$VITE_BASE_PATH
 
 RUN npm run build
 

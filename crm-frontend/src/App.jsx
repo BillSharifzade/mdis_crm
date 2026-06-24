@@ -15,7 +15,7 @@ import DetailSidebar from './components/DetailSidebar';
 import NotifPanel from './components/NotifPanel';
 import ToastContainer from './components/ToastContainer';
 import Login from './pages/Login';
-import { generateLeads, getStatusObj } from './data/crmData';
+import { getStatusObj } from './data/crmData';
 import { api, mapServerToClientLead, mapServerToClientInteraction, STATUS_ID_TO_KEY } from './services/api';
 import { useNotif } from './context/useNotif';
 import { UsersProvider } from './context/UsersContext';
@@ -54,8 +54,9 @@ function App() {
   });
   const [isAuthenticated, setIsAuthenticated] = useState(() => !USE_API || api.isAuthenticated());
   const [user, setUser] = useState(() => api.currentUser());
-  const [allLeads, setAllLeads] = useState(() => !USE_API ? generateLeads(248) : []);
+  const [allLeads, setAllLeads] = useState([]);
   const [isLoading, setIsLoading] = useState(USE_API && isAuthenticated);
+  const [loadError, setLoadError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
@@ -96,28 +97,29 @@ function App() {
       setAllLeads(data);
     } catch (error) {
       console.error(error);
-      showToast('Не удалось обновить список лидов', 'error');
+      const code = error?.status ?? 0;
+      showToast(`Не удалось обновить список лидов (код ${code}): ${error?.message || 'неизвестная ошибка'}`, 'error');
     }
   }, [showToast]);
 
-  useEffect(() => {
+  // Загрузка лидов. Никаких демо-данных: при ошибке показываем код + описание и кнопку «Повторить».
+  const loadLeads = useCallback(async () => {
     if (!USE_API || !isAuthenticated) return;
-    let cancelled = false;
-    api.getLeads()
-      .then(data => {
-        if (cancelled) return;
-        setAllLeads(data);
-        setIsLoading(false);
-      })
-      .catch(error => {
-        if (cancelled) return;
-        console.error(error);
-        showToast('API недоступно. Загружены демо-данные.', 'error');
-        setAllLeads(generateLeads(248));
-        setIsLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [showToast, isAuthenticated]);
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await api.getLeads();
+      setAllLeads(data);
+    } catch (error) {
+      console.error(error);
+      setAllLeads([]);
+      setLoadError({ code: error?.status ?? 0, message: error?.message || 'Неизвестная ошибка' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => { loadLeads(); }, [loadLeads]);
 
   // Тост-сводка KPI при входе для роли admissions.
   useEffect(() => {
@@ -428,7 +430,18 @@ function App() {
         />
 
         <main className="page-content">
-          {isLoading ? (
+          {loadError ? (
+            <div className="card" style={{ padding: 32, textAlign: 'center', maxWidth: 540, margin: '40px auto' }}>
+              <h2 style={{ color: 'var(--text-primary)' }}>Не удалось загрузить данные</h2>
+              <p style={{ color: '#ef4444', fontSize: 34, fontWeight: 700, margin: '12px 0 4px' }}>
+                {loadError.code ? `Код ${loadError.code}` : 'Нет соединения'}
+              </p>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: 20, wordBreak: 'break-word' }}>
+                {loadError.message}
+              </p>
+              <button className="btn btn-primary" onClick={loadLeads}>Повторить</button>
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center p-12">
               <div style={{ color: 'var(--text-primary)' }}>Загрузка данных...</div>
             </div>

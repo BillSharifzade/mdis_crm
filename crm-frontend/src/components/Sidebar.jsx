@@ -41,7 +41,7 @@ export default function Sidebar({ currentPage, navigate, isOpen, allLeads, user,
     return (
         <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`} id="sidebar">
             <div className="sidebar-logo">
-                <img src="/logo-4.png" alt="MDIS" className="sidebar-logo-img" />
+                <img src={`${import.meta.env.BASE_URL}logo-4.png`} alt="MDIS" className="sidebar-logo-img" />
                 <span className="logo-crm-text">CRM</span>
             </div>
 

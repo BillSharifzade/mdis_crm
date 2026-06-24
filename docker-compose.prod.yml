@@ -11,7 +11,12 @@
 #   JWT_SECRET            — секрет для подписи JWT
 #   WEBHOOK_SECRET        — секрет для X-Webhook-Secret (телефония)
 #   TELEGRAM_BOT_TOKEN    — токен бота
-#   PUBLIC_API_BASE_URL   — публичный URL API, виден из браузеров (например http://10.10.10.25:8082/api/v1)
+#   PUBLIC_API_BASE_URL   — публичный URL API, виден из браузеров (например https://dchr.koinotinav.com/mdis_crm/api/v1)
+#
+# Для раздачи под суб-путём за общим reverse-proxy (Caddy/OpenResty):
+#   PUBLIC_BASE_PATH      — суб-путь SPA, напр. "/mdis_crm/" (default "/"). Должен
+#                           совпадать с префиксом в reverse-proxy, а API URL — указывать
+#                           на <тот же префикс>/api/v1.
 #
 # Опциональные (порты на хосте — переопределяй, если базовые 5173/8082/5434 заняты другими проектами):
 #   WEB_PORT              — публичный порт фронтенда (default 5173)
@@ -45,5 +50,7 @@ services:
       args:
         VITE_API_BASE_URL: "${PUBLIC_API_BASE_URL:?PUBLIC_API_BASE_URL is required in prod}"
         VITE_USE_API: "true"
+        # Суб-путь публикации SPA за reverse-proxy (например /mdis_crm/). По умолчанию "/".
+        VITE_BASE_PATH: "${PUBLIC_BASE_PATH:-/}"
     ports: !override
       - "${WEB_PORT:-5173}:80"
