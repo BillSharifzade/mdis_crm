@@ -179,7 +179,7 @@ export default function Pipeline({ allLeads, openDetail, openModal, onStatusChan
                         </div>
                         <div className="modal-body">
                             <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12 }}>
-                                Для перевода в статус «Проиграно» необходимо указать причину (требование ТЗ, п. 6.5).
+                                Для перевода в статус «Отказ» необходимо указать причину (требование ТЗ, п. 6.5).
                             </p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                                 {['Высокая цена', 'Выбрал другой вуз', 'Не прошёл по баллам', 'Передумал', 'Нет ответа'].map(opt => (

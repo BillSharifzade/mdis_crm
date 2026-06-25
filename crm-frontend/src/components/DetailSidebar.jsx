@@ -15,7 +15,7 @@ const iconMap = {
 };
 
 const API_TO_STATUS = {
-    1: 'new', 2: 'consultation', 3: 'documents', 4: 'exams', 5: 'payment', 6: 'enrolled', 7: 'lost'
+    1: 'new', 2: 'consultation', 3: 'documents', 4: 'exams', 5: 'payment', 6: 'enrolled', 7: 'lost', 8: 'inquiry'
 };
 
 const REASON_OPTIONS = ['Высокая цена', 'Выбрал другой вуз', 'Не прошёл по баллам', 'Передумал', 'Нет ответа'];
@@ -336,7 +336,7 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
                         </div>
                         <div className="modal-body">
                             <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12 }}>
-                                Укажите причину для статуса «Проиграно» (обязательное поле по ТЗ, п. 6.5).
+                                Укажите причину для статуса «Отказ» (обязательное поле по ТЗ, п. 6.5).
                             </p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                                 {REASON_OPTIONS.map(opt => (

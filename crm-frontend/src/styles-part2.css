@@ -323,6 +323,12 @@
     background: currentColor
 }
 
+.s-inquiry {
+    color: #2dd4bf;
+    background: rgba(45, 212, 191, 0.12);
+    border: 1px solid rgba(45, 212, 191, 0.25)
+}
+
 .s-new {
     color: #a78bfa;
     background: rgba(167, 139, 250, 0.12);
@@ -363,6 +369,12 @@
     color: #f87171;
     background: rgba(248, 113, 113, 0.12);
     border: 1px solid rgba(248, 113, 113, 0.25)
+}
+
+[data-theme="light"] .s-inquiry {
+    color: #0d9488;
+    background: rgba(13, 148, 136, 0.08);
+    border-color: rgba(13, 148, 136, 0.2)
 }
 
 [data-theme="light"] .s-new {

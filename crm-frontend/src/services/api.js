@@ -7,12 +7,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081
 const USE_API_ENV = import.meta.env.VITE_USE_API;
 const USE_API = USE_API_ENV === undefined ? true : USE_API_ENV !== 'false';
 
-// Маппинг статусов клиент ↔ сервер (порядок этапов с правкой 06.04.2026: 3=Сбор документов, 4=Экзамены)
+// Маппинг статусов клиент ↔ сервер. id этапов стабильны (см. миграцию 000012):
+// id4 теперь «EET», id8 — «Обращение» (key 'inquiry'). Подписи берутся из
+// pipeline_stages, здесь только связь ключ ↔ id.
 const STATUS_TO_API = {
-    'new': 1, 'consultation': 2, 'documents': 3, 'exams': 4, 'payment': 5, 'enrolled': 6, 'lost': 7
+    'new': 1, 'consultation': 2, 'documents': 3, 'exams': 4, 'payment': 5, 'enrolled': 6, 'lost': 7, 'inquiry': 8
 };
 const API_TO_STATUS = {
-    1: 'new', 2: 'consultation', 3: 'documents', 4: 'exams', 5: 'payment', 6: 'enrolled', 7: 'lost'
+    1: 'new', 2: 'consultation', 3: 'documents', 4: 'exams', 5: 'payment', 6: 'enrolled', 7: 'lost', 8: 'inquiry'
 };
 
 const SOURCE_LABELS = {

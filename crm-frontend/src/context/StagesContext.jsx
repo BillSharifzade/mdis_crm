@@ -7,6 +7,7 @@ import { STATUS_ID_TO_KEY } from '../services/api.js';
 // Цвета по умолчанию для известных ключей — чтобы UI не выглядел серым,
 // если сервер ещё не вернул свои.
 const COLOR_BY_KEY = {
+    inquiry: '#14b8a6',
     new: '#6366f1',
     consultation: '#06b6d4',
     documents: '#f59e0b',
@@ -19,10 +20,11 @@ const COLOR_BY_KEY = {
 // Эвристический ключ из имени этапа — нужен, если админ переименовал стандартный.
 function deriveKey(name) {
     const n = (name || '').toLowerCase();
+    if (n.includes('обращ')) return 'inquiry';
     if (n.includes('нов')) return 'new';
     if (n.includes('консуль')) return 'consultation';
     if (n.includes('документ')) return 'documents';
-    if (n.includes('экзам') || n.includes('тест')) return 'exams';
+    if (n.includes('eet') || n.includes('экзам') || n.includes('тест')) return 'exams';
     if (n.includes('оплат') || n.includes('договор')) return 'payment';
     if (n.includes('зачисл')) return 'enrolled';
     if (n.includes('отказ') || n.includes('проигр')) return 'lost';
@@ -31,7 +33,7 @@ function deriveKey(name) {
 
 function classForKey(k) {
     return ({
-        new: 's-new', consultation: 's-consult', documents: 's-docs',
+        inquiry: 's-inquiry', new: 's-new', consultation: 's-consult', documents: 's-docs',
         exams: 's-exam', payment: 's-payment', enrolled: 's-enrolled', lost: 's-lost',
     })[k] || 's-new';
 }

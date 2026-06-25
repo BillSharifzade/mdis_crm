@@ -2,14 +2,17 @@
    MDIS CRM — Data & Utilities (shared across components)
    ==================================================== */
 
+// Порядок должен совпадать с воронкой в pipeline_stages (миграция 000012).
+// Ключи (key) стабильны — на них завязана логика; меняются только подписи.
 export const STATUSES = [
+    { key: 'inquiry', label: 'Обращение', cls: 's-inquiry', color: '#14b8a6' },
     { key: 'new', label: 'Новая заявка', cls: 's-new', color: '#6366f1' },
     { key: 'consultation', label: 'Консультация', cls: 's-consult', color: '#06b6d4' },
+    { key: 'exams', label: 'EET', cls: 's-exam', color: '#a855f7' },
     { key: 'documents', label: 'Сбор документов', cls: 's-docs', color: '#f59e0b' },
-    { key: 'exams', label: 'Экзамены', cls: 's-exam', color: '#a855f7' },
-    { key: 'payment', label: 'Оплата / договор', cls: 's-payment', color: '#ec4899' },
+    { key: 'payment', label: 'Оплата/Заключение договора', cls: 's-payment', color: '#ec4899' },
     { key: 'enrolled', label: 'Зачисление', cls: 's-enrolled', color: '#10b981' },
-    { key: 'lost', label: 'Проиграно', cls: 's-lost', color: '#ef4444' },
+    { key: 'lost', label: 'Отказ', cls: 's-lost', color: '#ef4444' },
 ];
 
 export const SOURCES = ['Сайт', 'Telegram', 'WhatsApp', 'Instagram', 'VK', 'Email', 'Звонок', 'Реклама Яндекс'];
@@ -56,7 +59,7 @@ function generateInteractions(n) {
 export function generateLeads(n) {
     const leads = [];
     const statKeys = STATUSES.map(s => s.key);
-    const weights = [30, 25, 15, 10, 8, 7, 5];
+    const weights = [18, 30, 22, 10, 8, 6, 4, 2];
     const cumWeights = weights.reduce((acc, w, i) => { acc.push((acc[i - 1] || 0) + w); return acc; }, []);
 
     for (let i = 0; i < n; i++) {

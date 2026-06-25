@@ -146,7 +146,7 @@ export default function Reports({ showToast }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 20 }}>
                 <KpiCard label="Всего лидов за период" value={inRange.length} color="#818cf8" loading={loadingLeads} />
                 <KpiCard label="Зачислено" value={totalEnrolled} color="#10b981" loading={loadingLeads} />
-                <KpiCard label="Проиграно" value={totalLost} color="#ef4444" loading={loadingLeads} />
+                <KpiCard label="Отказ" value={totalLost} color="#ef4444" loading={loadingLeads} />
                 <KpiCard label="Конверсия в зачисление" value={`${conversion}%`} color="#a855f7" loading={loadingLeads} />
                 <KpiCard label="Активно в работе" value={inRange.length - totalEnrolled - totalLost} color="#06b6d4" loading={loadingLeads} />
             </div>

@@ -90,7 +90,7 @@ export default function Analytics() {
         if (lostInstance.current) lostInstance.current.destroy();
         const reasons = refusalReasons.length > 0
             ? refusalReasons
-            : [{ label: 'Проиграно (всего)', value: dashTotals.totalLost || 0, color: '#ef4444' }];
+            : [{ label: 'Отказ (всего)', value: dashTotals.totalLost || 0, color: '#ef4444' }];
         const total = reasons.reduce((s, r) => s + r.value, 0) || 1;
         lostInstance.current = new Chart(lostRef.current.getContext('2d'), {
             type: 'pie',
@@ -169,7 +169,7 @@ export default function Analytics() {
                 </div>
                 <div className="chart-card">
                     <div className="chart-header">
-                        <div><h3>Причины отказов</h3><p>Статус — Проиграно</p></div>
+                        <div><h3>Причины отказов</h3><p>Статус — Отказ</p></div>
                     </div>
                     <div style={{ position: 'relative', height: '220px', width: '100%' }}>
                         <canvas ref={lostRef}></canvas>
