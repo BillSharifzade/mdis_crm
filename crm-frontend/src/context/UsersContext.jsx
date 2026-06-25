@@ -16,7 +16,7 @@ export function UsersProvider({ children, enabled }) {
     useEffect(() => {
         if (!api.useApi || !enabled) return;
         let cancelled = false;
-        api.getUsers()
+        api.getManagers()
             .then(data => {
                 if (cancelled) return;
                 const arr = Array.isArray(data) ? data : [];

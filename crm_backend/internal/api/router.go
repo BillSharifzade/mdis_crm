@@ -171,6 +171,10 @@ func (r *Router) InitRoutes() http.Handler {
 			// Публичный (для всех залогиненных) read-only список этапов воронки.
 			// Полный CRUD остаётся под /settings/stages (admin).
 			protected.Get("/stages", stagesPublicHandler.List)
+			// Слим read-only список назначаемых менеджеров (id/name/role) для
+			// выпадающих списков назначения лида. Доступно всем залогиненным
+			// ролям; полный /users CRUD остаётся admin-only.
+			protected.Get("/managers", userHandler.listManagers)
 			// Чат менеджера с лидом через Telegram (внутри CRM)
 			protected.Mount("/telegram-chat", tgChatHandler.Routes())
 			// Импорт лидов из Excel

@@ -472,6 +472,14 @@ export const api = {
         return Array.isArray(data) ? data : [];
     },
 
+    // Слим read-only список назначаемых менеджеров (id/name/role).
+    // Доступен всем ролям — в отличие от admin-only getUsers().
+    getManagers: async () => {
+        const response = await fetchWithAuth(`/managers`);
+        const data = await handleResponse(response);
+        return Array.isArray(data) ? data : [];
+    },
+
     createUser: async (userData) => {
         const response = await fetchWithAuth(`/users`, {
             method: 'POST',

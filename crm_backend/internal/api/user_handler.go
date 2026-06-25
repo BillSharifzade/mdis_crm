@@ -48,6 +48,31 @@ func (h *UserHandler) listUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
+// listManagers godoc
+// @Summary List assignable managers
+// @Description Read-only slim list of users that can be assigned to a lead (admin + admissions). Returns only id, name and role — no emails. Accessible to any authenticated role.
+// @Tags users
+// @Produce json
+// @Success 200 {array} model.Manager
+// @Security Bearer
+// @Router /managers [get]
+func (h *UserHandler) listManagers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.svc.ListUsers(r.Context())
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to list managers"})
+		return
+	}
+	managers := make([]model.Manager, 0, len(users))
+	for _, u := range users {
+		if u.Role == "admin" || u.Role == "admissions" {
+			managers = append(managers, model.Manager{ID: u.ID, Name: u.Name, Role: u.Role})
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(managers)
+}
+
 // createUser godoc
 // @Summary Create a new user
 // @Description Register a new system user with a role.
