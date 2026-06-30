@@ -47,6 +47,7 @@ export default function LeadModal({ onClose, onSave, showToast }) {
             programId: selectedProgram?.id > 0 ? selectedProgram.id : null,
             assigneeId: selectedManager?.id > 0 ? selectedManager.id : null,
             socialUrl: form.socialUrl.trim(),
+            comment: form.comment.trim(),
             status: 'new',
             date: new Date(),
             color: randEl(AVATAR_COLORS),

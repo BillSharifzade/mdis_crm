@@ -231,6 +231,16 @@ function App() {
       } else {
         created = { ...newLead, id: Date.now() };
       }
+      // Persist the optional free-text comment as a note interaction so it
+      // survives a reload (leads have no notes column of their own).
+      const comment = (newLead.comment || '').trim();
+      if (comment && USE_API && created?.id) {
+        try {
+          await api.createInteraction(created.id, 'manual_note', comment);
+        } catch (e) {
+          console.error('Failed to save lead comment', e);
+        }
+      }
       // Upsert by id: the SSE "lead.created" event may have already inserted
       // this lead before the POST response resolved. Merge instead of blindly
       // prepending, otherwise the same lead shows up twice.
