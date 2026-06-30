@@ -63,6 +63,7 @@ func (h *InteractionHandler) addInteraction(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(interaction)
 }
