@@ -28,6 +28,8 @@ type TelegramChatRepo interface {
 	SetBotActive(ctx context.Context, id int, active bool) error
 	SetLeadID(ctx context.Context, id int, leadID int) error
 	SetCollected(ctx context.Context, id int, field, value string) error
+	GetPollOffset(ctx context.Context) (int, error)
+	SetPollOffset(ctx context.Context, offset int) error
 }
 
 type ProgramLookup interface {
@@ -139,7 +141,16 @@ func (s *TelegramBotService) StartPolling(ctx context.Context, process func(cont
 	log.Println("[telegram] long-polling getUpdates loop started")
 
 	const pollTimeoutSec = 30
-	var offset int
+
+	// Восстанавливаем offset из БД, чтобы после рестарта не переигрывать уже
+	// обработанные апдейты (главная причина дублей/повторных вопросов у бота).
+	offset := 0
+	if s.chats != nil {
+		if saved, err := s.chats.GetPollOffset(ctx); err == nil && saved > 0 {
+			offset = saved
+			log.Printf("[telegram] resuming from saved poll offset=%d", offset)
+		}
+	}
 
 	for {
 		if ctx.Err() != nil {
@@ -151,7 +162,17 @@ func (s *TelegramBotService) StartPolling(ctx context.Context, process func(cont
 			if ctx.Err() != nil {
 				return
 			}
-			log.Printf("[telegram] getUpdates: %v", err)
+			// 409 Conflict = другой потребитель getUpdates активен: либо
+			// зарегистрирован webhook, либо параллельно запущен ВТОРОЙ экземпляр
+			// бэкенда с тем же TELEGRAM_BOT_TOKEN. Это приводит к «странному»
+			// поведению: сообщения обрабатываются то одним, то другим процессом,
+			// состояние диалога расходится, ответы дублируются. Чинится
+			// остановкой лишнего инстанса (или пустым токеном на одном из них).
+			if strings.Contains(err.Error(), "Conflict") || strings.Contains(err.Error(), "terminated by other") {
+				log.Printf("[telegram] getUpdates CONFLICT — вероятно запущен второй экземпляр бота с тем же токеном ИЛИ установлен webhook. Остановите дубликат. (%v)", err)
+			} else {
+				log.Printf("[telegram] getUpdates: %v", err)
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -172,6 +193,12 @@ func (s *TelegramBotService) StartPolling(ctx context.Context, process func(cont
 			}
 			if err := process(ctx, &u); err != nil {
 				log.Printf("[telegram] process update %d: %v", u.UpdateID, err)
+			}
+			// Сохраняем offset ПОСЛЕ обработки — рестарт продолжит со следующего.
+			if s.chats != nil {
+				if err := s.chats.SetPollOffset(ctx, offset); err != nil {
+					log.Printf("[telegram] persist poll offset: %v", err)
+				}
 			}
 		}
 	}
@@ -238,6 +265,15 @@ func menuKeyboard() [][]telegram.InlineButton {
 		{{Text: "Регистрация на мероприятие", CallbackData: "menu:event"}},
 		{{Text: "Записаться на EET тест", CallbackData: "menu:eet"}},
 		{{Text: "📝 Подать заявку", CallbackData: "menu:apply"}},
+	}
+}
+
+// englishSkipKeyboard — единственная кнопка «Пропустить» под вопросом об
+// уровне английского. Абитуриент либо печатает балл (например «IELTS 6.0»),
+// либо пропускает шаг.
+func englishSkipKeyboard() [][]telegram.InlineButton {
+	return [][]telegram.InlineButton{
+		{{Text: "Пропустить", CallbackData: "english:skip"}},
 	}
 }
 
@@ -321,6 +357,8 @@ func (s *TelegramBotService) HandleIncoming(ctx context.Context, payload *model.
 
 	askProgramText := s.setting(ctx, "ask_program",
 		"Спасибо! Какая программа вас интересует? Выберите вариант на кнопке ниже 👇")
+	askEnglishText := s.setting(ctx, "ask_english",
+		"Какой у вас уровень английского? Напишите систему и балл — например «IELTS 6.0», «EET 3.5» или «Duolingo 100». Если ещё не сдавали — нажмите «Пропустить».")
 	askPhoneText := s.setting(ctx, "ask_phone",
 		"Отлично! Оставьте, пожалуйста, ваш номер телефона для связи (например, +992 90 123 45 67).")
 	handoffText := s.setting(ctx, "handoff",
@@ -351,6 +389,12 @@ func (s *TelegramBotService) HandleIncoming(ctx context.Context, payload *model.
 				"Пожалуйста, выберите программу кнопкой ниже 👇", programKeyboard(programs))
 		}
 		_ = s.chats.SetCollected(ctx, chat.ID, "collected_program", program)
+		_ = s.chats.UpdateState(ctx, chat.ID, model.BotStateAskEnglish)
+		return s.replyWithKeyboard(ctx, chat, askEnglishText, englishSkipKeyboard())
+
+	case model.BotStateAskEnglish:
+		// Абитуриент напечатал уровень английского вручную (вместо «Пропустить»).
+		_ = s.chats.SetCollected(ctx, chat.ID, "collected_english", text)
 		_ = s.chats.UpdateState(ctx, chat.ID, model.BotStateAskPhone)
 		return s.reply(ctx, chat, askPhoneText)
 
@@ -372,13 +416,14 @@ func (s *TelegramBotService) HandleIncoming(ctx context.Context, payload *model.
 		tgIDStr := fmt.Sprintf("%d", payload.Message.From.ID)
 
 		req := &model.CreateLeadRequest{
-			FirstName:  fn,
-			LastName:   ln,
-			Phone:      text,
-			TelegramID: tgIDStr,
-			UTMSource:  "telegram",
-			UTMMedium:  "bot",
-			UTMCampaign: "admissions_bot",
+			FirstName:    fn,
+			LastName:     ln,
+			Phone:        text,
+			TelegramID:   tgIDStr,
+			EnglishLevel: chat.CollectedEnglish,
+			UTMSource:    "telegram",
+			UTMMedium:    "bot",
+			UTMCampaign:  "admissions_bot",
 		}
 		// LeadService defaults source_id=1 если SourceID нет, но на проде
 		// id=1 может быть удалён (справочник чистится админом) → FK violation
@@ -402,8 +447,12 @@ func (s *TelegramBotService) HandleIncoming(ctx context.Context, payload *model.
 		chat.LeadID = &lead.ID
 
 		// Сводка анкеты в виде заметки
-		summary := fmt.Sprintf("Telegram-бот собрал анкету:\n• ФИО: %s\n• Программа: %s\n• Телефон: %s",
-			chat.CollectedName, chat.CollectedProgram, text)
+		englishSummary := chat.CollectedEnglish
+		if englishSummary == "" {
+			englishSummary = "не указан"
+		}
+		summary := fmt.Sprintf("Telegram-бот собрал анкету:\n• ФИО: %s\n• Программа: %s\n• Английский: %s\n• Телефон: %s",
+			chat.CollectedName, chat.CollectedProgram, englishSummary, text)
 		_, _ = s.intSvc.AddInteraction(ctx, &model.CreateInteractionRequest{
 			LeadID:    &lead.ID,
 			Type:      "note",
@@ -513,6 +562,21 @@ func (s *TelegramBotService) handleCallback(ctx context.Context, cb *model.Teleg
 		}
 	}
 
+	askPhoneText := s.setting(ctx, "ask_phone",
+		"Отлично! Оставьте, пожалуйста, ваш номер телефона для связи (например, +992 90 123 45 67).")
+
+	// ── Пропуск уровня английского ────────────────────────
+	if cb.Data == "english:skip" {
+		if chat.BotState != model.BotStateAskEnglish {
+			ack("")
+			return nil
+		}
+		ack("")
+		_ = s.chats.SetCollected(ctx, chat.ID, "collected_english", "")
+		_ = s.chats.UpdateState(ctx, chat.ID, model.BotStateAskPhone)
+		return s.reply(ctx, chat, askPhoneText)
+	}
+
 	// ── Выбор программы ───────────────────────────────────
 	if chat.BotState != model.BotStateAskProgram {
 		ack("")
@@ -532,13 +596,13 @@ func (s *TelegramBotService) handleCallback(ctx context.Context, cb *model.Teleg
 	program := programs[idx]
 	ack("")
 
-	askPhoneText := s.setting(ctx, "ask_phone",
-		"Отлично! Оставьте, пожалуйста, ваш номер телефона для связи (например, +992 90 123 45 67).")
+	askEnglishText := s.setting(ctx, "ask_english",
+		"Какой у вас уровень английского? Напишите систему и балл — например «IELTS 6.0», «EET 3.5» или «Duolingo 100». Если ещё не сдавали — нажмите «Пропустить».")
 
 	_ = s.chats.SetCollected(ctx, chat.ID, "collected_program", program)
-	_ = s.chats.UpdateState(ctx, chat.ID, model.BotStateAskPhone)
+	_ = s.chats.UpdateState(ctx, chat.ID, model.BotStateAskEnglish)
 	_ = s.reply(ctx, chat, fmt.Sprintf("Выбрано: <b>%s</b>", program))
-	return s.reply(ctx, chat, askPhoneText)
+	return s.replyWithKeyboard(ctx, chat, askEnglishText, englishSkipKeyboard())
 }
 
 // ManagerSend — отправка сообщения вручную из CRM в Telegram.
@@ -557,8 +621,10 @@ func (s *TelegramBotService) ManagerSend(ctx context.Context, leadID int, userID
 	if s.client == nil {
 		return fmt.Errorf("telegram bot token is not configured")
 	}
-	if err := s.client.SendMessage(ctx, chat.ChatID, text); err != nil {
-		return err
+	// Произвольный текст менеджера отправляем как plain text (без HTML parse),
+	// иначе `<`, `&` и т.п. приводят к 400 и сообщение не доходит.
+	if err := s.client.SendMessagePlain(ctx, chat.ChatID, text); err != nil {
+		return fmt.Errorf("telegram send failed: %w", err)
 	}
 	// Помечаем чат как handoff
 	_ = s.chats.UpdateState(ctx, chat.ID, model.BotStateManager)

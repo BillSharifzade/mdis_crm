@@ -85,6 +85,17 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) err
 	})
 }
 
+// SendMessagePlain отправляет текст БЕЗ HTML-разметки. Используется для
+// произвольного текста менеджера: с ParseMode=HTML символы вроде `<`, `&`
+// (например в ссылках с query-параметрами) ломают парсинг и Telegram
+// отвечает 400 «can't parse entities» — сообщение молча не доходит.
+func (c *Client) SendMessagePlain(ctx context.Context, chatID int64, text string) error {
+	return c.call(ctx, "sendMessage", sendMessagePayload{
+		ChatID: chatID,
+		Text:   text,
+	})
+}
+
 // SendMessageWithKeyboard отправляет сообщение с inline-кнопками под ним.
 // Каждая внутренняя группа `[]InlineButton` рендерится одним рядом.
 func (c *Client) SendMessageWithKeyboard(ctx context.Context, chatID int64, text string, rows [][]InlineButton) error {

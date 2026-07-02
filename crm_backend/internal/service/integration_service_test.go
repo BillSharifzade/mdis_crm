@@ -67,6 +67,9 @@ func (m *mockTGChatRepo) SetCollected(ctx context.Context, id int, field, value 
 	return nil
 }
 
+func (m *mockTGChatRepo) GetPollOffset(ctx context.Context) (int, error) { return 0, nil }
+func (m *mockTGChatRepo) SetPollOffset(ctx context.Context, offset int) error { return nil }
+
 func TestIntegrationService_ProcessTelegramWebhook(t *testing.T) {
 	contactRepo := &mockContactRepo{contact: &model.Contact{ID: 1}}
 	leadRepo := &mockLeadRepo{createdLead: &model.Lead{ID: 1}}

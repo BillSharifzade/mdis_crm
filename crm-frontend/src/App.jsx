@@ -16,7 +16,7 @@ import NotifPanel from './components/NotifPanel';
 import ToastContainer from './components/ToastContainer';
 import Login from './pages/Login';
 import { getStatusObj } from './data/crmData';
-import { api, mapServerToClientLead, mapServerToClientInteraction, STATUS_ID_TO_KEY } from './services/api';
+import { api, mapServerToClientLead, mapServerToClientInteraction, statusIdToKey } from './services/api';
 import { useNotif } from './context/useNotif';
 import { UsersProvider } from './context/UsersContext';
 import { ProgramsProvider } from './context/ProgramsContext';
@@ -203,7 +203,7 @@ function App() {
         } else if (type === 'lead.deleted' && payload?.id) {
           setAllLeads(prev => prev.filter(l => l.id !== payload.id));
         } else if (type === 'lead.status_changed' && payload?.lead_id) {
-          const statusKey = STATUS_ID_TO_KEY[payload.new_status_id] || 'new';
+          const statusKey = statusIdToKey(payload.new_status_id);
           setAllLeads(prev => prev.map(l => l.id === payload.lead_id ? { ...l, status: statusKey, refusalReason: payload.refusal_reason || l.refusalReason } : l));
           const stObj = getStatusObj(statusKey);
           pushNotif({ type: statusKey === 'enrolled' ? 'enrolled' : (statusKey === 'lost' ? 'lost' : 'status_change'), text: `Лид #${payload.lead_id} → <strong>${stObj.label}</strong>`, leadId: payload.lead_id });

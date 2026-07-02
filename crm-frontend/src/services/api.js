@@ -17,6 +17,40 @@ const API_TO_STATUS = {
     1: 'new', 2: 'consultation', 3: 'documents', 4: 'exams', 5: 'payment', 6: 'enrolled', 7: 'lost', 8: 'inquiry'
 };
 
+// Динамические карты этап↔id, заполняются из pipeline_stages сервера
+// (см. StagesContext.setStageMaps). Нужны, чтобы КАСТОМНЫЕ этапы, созданные
+// админом в Settings (id ≥ 9, произвольные названия), корректно
+// маппились в обе стороны. Без этого статус таких этапов молча сбрасывался
+// в id=1 «Новая заявка», а бейдж показывался неверным.
+let DYN_ID_TO_KEY = {};
+let DYN_KEY_TO_ID = {};
+
+export function setStageMaps(idToKey, keyToId) {
+    DYN_ID_TO_KEY = idToKey || {};
+    DYN_KEY_TO_ID = keyToId || {};
+}
+
+// statusIdToKey — id этапа → стабильный ключ. Приоритет: динамическая карта
+// с сервера → статическая (базовые этапы) → синтетический stage-<id>.
+export function statusIdToKey(statusId) {
+    if (statusId == null) return 'new';
+    if (DYN_ID_TO_KEY[statusId]) return DYN_ID_TO_KEY[statusId];
+    if (API_TO_STATUS[statusId]) return API_TO_STATUS[statusId];
+    return `stage-${statusId}`;
+}
+
+// statusKeyToId — ключ этапа → numeric id для PATCH. Обратный приоритет.
+// null означает «неизвестный ключ» (карты ещё не загрузились) — вызывающий
+// решает, что делать.
+export function statusKeyToId(statusStr) {
+    if (statusStr == null) return null;
+    if (statusStr in DYN_KEY_TO_ID) return DYN_KEY_TO_ID[statusStr];
+    if (statusStr in STATUS_TO_API) return STATUS_TO_API[statusStr];
+    const m = /^stage-(\d+)$/.exec(String(statusStr));
+    if (m) return Number(m[1]);
+    return null;
+}
+
 const SOURCE_LABELS = {
     site: 'Сайт', telegram: 'Telegram', whatsapp: 'WhatsApp',
     instagram: 'Instagram', vk: 'VK', email: 'Email',
@@ -35,7 +69,7 @@ export const mapServerToClientLead = (serverLead) => {
         source: SOURCE_LABELS[serverLead.utm_source] || serverLead.utm_source || 'Сайт',
         program: serverLead.program_name || '—',
         programId: serverLead.program_id || null,
-        status: API_TO_STATUS[serverLead.status_id] || 'new',
+        status: statusIdToKey(serverLead.status_id),
         statusId: serverLead.status_id || null,
         managerIdx: serverLead.assignee_id ? Math.abs(serverLead.assignee_id) % 3 : 0,
         assigneeId: serverLead.assignee_id || null,
@@ -43,6 +77,7 @@ export const mapServerToClientLead = (serverLead) => {
         color: AVATAR_COLORS[(serverLead.id || 0) % AVATAR_COLORS.length] || AVATAR_COLORS[0],
         interactions: [],
         refusalReason: serverLead.refusal_reason || '',
+        englishLevel: serverLead.english_level || '',
         telegramId: serverLead.telegram_id || '',
         whatsappId: serverLead.whatsapp_id || '',
         vkId: serverLead.vk_id || '',
@@ -199,6 +234,7 @@ export const api = {
         };
         if (clientLeadData.programId) serverPayload.program_id = clientLeadData.programId;
         if (clientLeadData.socialUrl) serverPayload.social_url = clientLeadData.socialUrl;
+        if (clientLeadData.englishLevel) serverPayload.english_level = clientLeadData.englishLevel;
         if (clientLeadData.assigneeId) serverPayload.assignee_id = clientLeadData.assigneeId;
         const response = await fetchWithAuth(`/leads`, {
             method: 'POST',
@@ -210,7 +246,10 @@ export const api = {
     },
 
     updateLeadStatus: async (id, statusStr, refusalReason = '') => {
-        const status_id = STATUS_TO_API[statusStr] || 1;
+        const status_id = statusKeyToId(statusStr);
+        if (status_id == null) {
+            throw new Error(`Неизвестный этап воронки: ${statusStr}`);
+        }
         const payload = { status_id };
         if (refusalReason) payload.refusal_reason = refusalReason;
         const response = await fetchWithAuth(`/leads/${id}/status`, {
@@ -259,6 +298,7 @@ export const api = {
         if (clientLead.assigneeId != null) payload.assignee_id = clientLead.assigneeId;
         if (clientLead.programId != null) payload.program_id = clientLead.programId;
         if (clientLead.socialUrl !== undefined) payload.social_url = clientLead.socialUrl;
+        if (clientLead.englishLevel !== undefined) payload.english_level = clientLead.englishLevel;
         const response = await fetchWithAuth(`/leads/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },

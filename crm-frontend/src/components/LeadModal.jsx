@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Save } from 'lucide-react';
-import { SOURCES, PROGRAMS, AVATAR_COLORS, randEl, getInitials } from '../data/crmData';
+import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, AVATAR_COLORS, randEl, getInitials } from '../data/crmData';
 import { useUsers } from '../context/useUsers';
 import { usePrograms } from '../context/usePrograms';
 
@@ -19,6 +19,8 @@ export default function LeadModal({ onClose, onSave, showToast }) {
         programId: programOptions[0]?.id ?? null,
         assigneeId: null, // по умолчанию — round-robin на бэкенде
         socialUrl: '',
+        englishSystem: '',
+        englishScore: '',
         comment: ''
     });
 
@@ -37,6 +39,9 @@ export default function LeadModal({ onClose, onSave, showToast }) {
         }
         const selectedProgram = programOptions.find(p => p.id === form.programId);
         const selectedManager = managerOptions.find(u => u.id === form.assigneeId);
+        const englishLevel = form.englishSystem && form.englishScore
+            ? `${form.englishSystem} ${form.englishScore}`
+            : '';
         onSave({
             name: form.fio,
             initials: getInitials(form.fio),
@@ -47,6 +52,7 @@ export default function LeadModal({ onClose, onSave, showToast }) {
             programId: selectedProgram?.id > 0 ? selectedProgram.id : null,
             assigneeId: selectedManager?.id > 0 ? selectedManager.id : null,
             socialUrl: form.socialUrl.trim(),
+            englishLevel,
             comment: form.comment.trim(),
             status: 'new',
             date: new Date(),
@@ -104,6 +110,27 @@ export default function LeadModal({ onClose, onSave, showToast }) {
                                 value={form.socialUrl}
                                 onChange={e => handleChange('socialUrl', e.target.value)}
                             />
+                        </div>
+                        <div className="form-group">
+                            <label>Уровень английского</label>
+                            <select
+                                value={form.englishSystem}
+                                onChange={e => setForm(prev => ({ ...prev, englishSystem: e.target.value, englishScore: '' }))}
+                            >
+                                <option value="">— не указан —</option>
+                                {Object.keys(ENGLISH_SYSTEMS).map(sys => <option key={sys} value={sys}>{sys}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Балл</label>
+                            <select
+                                value={form.englishScore}
+                                onChange={e => handleChange('englishScore', e.target.value)}
+                                disabled={!form.englishSystem}
+                            >
+                                <option value="">{form.englishSystem ? '— выберите балл —' : '— сначала система —'}</option>
+                                {(ENGLISH_SYSTEMS[form.englishSystem] || []).map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
                         </div>
                         <div className="form-group full-width">
                             <label>Комментарий</label>

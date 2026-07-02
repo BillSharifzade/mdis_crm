@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { StagesContext } from './stagesContextValue.js';
 import { api } from '../services/api.js';
-import { STATUSES as DEFAULT_STAGES } from '../data/crmData.js';
-import { STATUS_ID_TO_KEY } from '../services/api.js';
+import { STATUSES as DEFAULT_STAGES, setDynamicStages } from '../data/crmData.js';
+import { STATUS_ID_TO_KEY, setStageMaps } from '../services/api.js';
 
 // Цвета по умолчанию для известных ключей — чтобы UI не выглядел серым,
 // если сервер ещё не вернул свои.
@@ -18,7 +18,10 @@ const COLOR_BY_KEY = {
 };
 
 // Эвристический ключ из имени этапа — нужен, если админ переименовал стандартный.
-function deriveKey(name) {
+// Для полностью кастомных этапов возвращаем СТАБИЛЬНЫЙ ключ `stage-<id>`
+// (не случайный!), иначе ключ менялся при каждой загрузке и статус этапа
+// невозможно было ни выставить, ни отобразить.
+function deriveKey(name, id) {
     const n = (name || '').toLowerCase();
     if (n.includes('обращ')) return 'inquiry';
     if (n.includes('нов')) return 'new';
@@ -28,7 +31,7 @@ function deriveKey(name) {
     if (n.includes('оплат') || n.includes('договор')) return 'payment';
     if (n.includes('зачисл')) return 'enrolled';
     if (n.includes('отказ') || n.includes('проигр')) return 'lost';
-    return 'st_' + Math.random().toString(36).slice(2, 8);
+    return `stage-${id}`;
 }
 
 function classForKey(k) {
@@ -51,7 +54,7 @@ export function StagesProvider({ children, enabled }) {
             const mapped = data
                 .filter(s => s.is_active !== false)
                 .map(s => {
-                    const key = STATUS_ID_TO_KEY[s.id] || deriveKey(s.name);
+                    const key = STATUS_ID_TO_KEY[s.id] || deriveKey(s.name, s.id);
                     return {
                         id: s.id,
                         key,
@@ -63,6 +66,14 @@ export function StagesProvider({ children, enabled }) {
                     };
                 })
                 .sort((a, b) => a.order - b.order);
+            // Публикуем карты этап↔id и живой список этапов, чтобы api.js
+            // (mapServerToClientLead / updateLeadStatus) и getStatusObj
+            // работали с реальными этапами из БД, включая кастомные.
+            const idToKey = {};
+            const keyToId = {};
+            mapped.forEach(s => { idToKey[s.id] = s.key; keyToId[s.key] = s.id; });
+            setStageMaps(idToKey, keyToId);
+            setDynamicStages(mapped);
             setStages(mapped);
         } catch (err) {
             console.warn('stages load failed', err);

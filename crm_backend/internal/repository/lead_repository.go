@@ -29,11 +29,11 @@ func (r *LeadRepository) Create(ctx context.Context, lead *model.CreateLeadReque
 		INSERT INTO leads (
 			first_name, last_name, email, phone, program_id,
 			utm_source, utm_medium, utm_campaign, source_id, status_id,
-			assignee_id, social_url, created_at, updated_at
+			assignee_id, social_url, english_level, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9, $10,
-			$11, $12, $13, $14
+			$11, $12, $13, $14, $15
 		) RETURNING id, created_at, updated_at
 	`
 
@@ -46,7 +46,7 @@ func (r *LeadRepository) Create(ctx context.Context, lead *model.CreateLeadReque
 	err := r.db.Pool.QueryRow(ctx, query,
 		lead.FirstName, lead.LastName, lead.Email, lead.Phone, lead.ProgramID,
 		lead.UTMSource, lead.UTMMedium, lead.UTMCampaign, sourceID, statusID,
-		lead.AssigneeID, nullStr(lead.SocialURL), now, now,
+		lead.AssigneeID, nullStr(lead.SocialURL), nullStr(lead.EnglishLevel), now, now,
 	).Scan(&newLead.ID, &newLead.CreatedAt, &newLead.UpdatedAt)
 
 	if err != nil {
@@ -65,6 +65,7 @@ func (r *LeadRepository) Create(ctx context.Context, lead *model.CreateLeadReque
 	newLead.StatusID = &statusID
 	newLead.AssigneeID = lead.AssigneeID
 	newLead.SocialURL = lead.SocialURL
+	newLead.EnglishLevel = lead.EnglishLevel
 
 	return &newLead, nil
 }
@@ -95,6 +96,7 @@ func (r *LeadRepository) GetByID(ctx context.Context, id int) (*model.Lead, erro
 			COALESCE(l.utm_source, ''), COALESCE(l.utm_medium, ''), COALESCE(l.utm_campaign, ''),
 			COALESCE(c.telegram_id, ''), COALESCE(c.whatsapp_id, ''), COALESCE(c.vk_id, ''),
 			COALESCE(l.social_url, ''),
+			COALESCE(l.english_level, ''),
 			COALESCE(p.name, ''),
 			l.created_at, l.updated_at
 		FROM leads l
@@ -109,6 +111,7 @@ func (r *LeadRepository) GetByID(ctx context.Context, id int) (*model.Lead, erro
 		&lead.UTMSource, &lead.UTMMedium, &lead.UTMCampaign,
 		&lead.TelegramID, &lead.WhatsAppID, &lead.VKID,
 		&lead.SocialURL,
+		&lead.EnglishLevel,
 		&lead.ProgramName,
 		&lead.CreatedAt, &lead.UpdatedAt,
 	)
@@ -135,12 +138,13 @@ func (r *LeadRepository) Update(ctx context.Context, leadID int, req *model.Upda
 		    assignee_id = COALESCE($6, assignee_id),
 		    utm_source = COALESCE($7, utm_source),
 		    social_url = COALESCE($8, social_url),
-		    updated_at = $9
-		WHERE id = $10
+		    english_level = COALESCE($9, english_level),
+		    updated_at = $10
+		WHERE id = $11
 	`
 	_, err := r.db.Pool.Exec(ctx, query,
 		req.FirstName, req.LastName, req.Email, req.Phone,
-		req.ProgramID, req.AssigneeID, req.UTMSource, req.SocialURL,
+		req.ProgramID, req.AssigneeID, req.UTMSource, req.SocialURL, req.EnglishLevel,
 		time.Now(), leadID,
 	)
 	if err != nil {
@@ -189,6 +193,7 @@ func (r *LeadRepository) List(ctx context.Context, limit, offset int) ([]model.L
 			COALESCE(l.utm_source, ''), COALESCE(l.utm_medium, ''), COALESCE(l.utm_campaign, ''),
 			COALESCE(c.telegram_id, ''), COALESCE(c.whatsapp_id, ''), COALESCE(c.vk_id, ''),
 			COALESCE(l.social_url, ''),
+			COALESCE(l.english_level, ''),
 			COALESCE(p.name, ''),
 			l.created_at, l.updated_at
 		FROM leads l
@@ -211,6 +216,7 @@ func (r *LeadRepository) List(ctx context.Context, limit, offset int) ([]model.L
 			&lead.UTMSource, &lead.UTMMedium, &lead.UTMCampaign,
 			&lead.TelegramID, &lead.WhatsAppID, &lead.VKID,
 			&lead.SocialURL,
+			&lead.EnglishLevel,
 			&lead.ProgramName,
 			&lead.CreatedAt, &lead.UpdatedAt,
 		)

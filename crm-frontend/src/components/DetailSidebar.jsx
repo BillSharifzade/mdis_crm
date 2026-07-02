@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Phone, MessageCircle, Mail, Pencil, Plus, Send, Trash2, Save, Link as LinkIcon } from 'lucide-react';
-import { SOURCES, PROGRAMS, getStatusObj, formatHoursAgo } from '../data/crmData';
-import { api } from '../services/api';
+import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, getStatusObj, formatHoursAgo } from '../data/crmData';
+import { api, statusIdToKey } from '../services/api';
 import TelegramChatModal from './TelegramChatModal';
 import CallModal from './CallModal';
 import { useUsers } from '../context/useUsers';
@@ -12,10 +12,6 @@ const iconMap = {
     'phone': Phone,
     'message-circle': MessageCircle,
     'mail': Mail,
-};
-
-const API_TO_STATUS = {
-    1: 'new', 2: 'consultation', 3: 'documents', 4: 'exams', 5: 'payment', 6: 'enrolled', 7: 'lost', 8: 'inquiry'
 };
 
 const REASON_OPTIONS = ['Высокая цена', 'Выбрал другой вуз', 'Не прошёл по баллам', 'Передумал', 'Нет ответа'];
@@ -181,6 +177,7 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
                             <div className="detail-field"><label>Дата заявки</label><span>{leadDate.toLocaleDateString('ru-RU')}</span></div>
                             <div className="detail-field"><label>Программа</label><span>{lead.program}</span></div>
                             <div className="detail-field"><label>Менеджер</label><span>{managerLabel}</span></div>
+                            <div className="detail-field"><label>Английский</label><span>{lead.englishLevel || '—'}</span></div>
                             <div className="detail-field" style={{ gridColumn: 'span 2' }}>
                                 <label>Соцсеть</label>
                                 <span>
@@ -268,7 +265,7 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
                         <div className="detail-section-title">История изменения статусов</div>
                         <div className="interaction-list">
                             {statusHistory.length > 0 ? statusHistory.map((h, i) => {
-                                const stKey = API_TO_STATUS[h.new_status_id] || 'new';
+                                const stKey = statusIdToKey(h.new_status_id);
                                 const stObj = getStatusObj(stKey);
                                 const createdTime = new Date(h.created_at).getTime();
                                 const hoursAgo = Math.max(0, Math.floor((nowMs - createdTime) / (1000 * 60 * 60)));
@@ -393,6 +390,11 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
         || programOptions[0]?.id
         || null;
 
+    // Разбираем сохранённый уровень «SYS SCORE» (например «IELTS 6.0») на части.
+    const [engSys0, ...engRest] = (lead.englishLevel || '').trim().split(/\s+/);
+    const initialEnglishSystem = ENGLISH_SYSTEMS[engSys0] ? engSys0 : '';
+    const initialEnglishScore = initialEnglishSystem ? engRest.join(' ') : '';
+
     const [form, setForm] = useState({
         name: lead.name || '',
         phone: lead.phone || '',
@@ -401,6 +403,8 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
         source: lead.source || SOURCES[0],
         assigneeId: lead.assigneeId || (users[0] && users[0].id) || null,
         socialUrl: lead.socialUrl || '',
+        englishSystem: initialEnglishSystem,
+        englishScore: initialEnglishScore,
     });
     const [busy, setBusy] = useState(false);
 
@@ -413,9 +417,13 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
         }
         const chosenProgram = programOptions.find(p => p.id === form.programId);
         setBusy(true);
+        const englishLevel = form.englishSystem && form.englishScore
+            ? `${form.englishSystem} ${form.englishScore}`
+            : '';
         await onSave({
             ...form,
             socialUrl: form.socialUrl.trim(),
+            englishLevel,
             program: chosenProgram?.name || lead.program,
             programId: chosenProgram?.id > 0 ? chosenProgram.id : null,
         });
@@ -461,6 +469,27 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
                                 <select value={form.assigneeId || ''} onChange={e => setForm({ ...form, assigneeId: e.target.value ? parseInt(e.target.value, 10) : null })}>
                                     <option value="">— не назначен —</option>
                                     {eligibleManagers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Английский</label>
+                                <select
+                                    value={form.englishSystem}
+                                    onChange={e => setForm({ ...form, englishSystem: e.target.value, englishScore: '' })}
+                                >
+                                    <option value="">— не указан —</option>
+                                    {Object.keys(ENGLISH_SYSTEMS).map(sys => <option key={sys} value={sys}>{sys}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Балл</label>
+                                <select
+                                    value={form.englishScore}
+                                    onChange={e => setForm({ ...form, englishScore: e.target.value })}
+                                    disabled={!form.englishSystem}
+                                >
+                                    <option value="">{form.englishSystem ? '— выберите —' : '— система —'}</option>
+                                    {(ENGLISH_SYSTEMS[form.englishSystem] || []).map(v => <option key={v} value={v}>{v}</option>)}
                                 </select>
                             </div>
                             <div className="form-group full-width">

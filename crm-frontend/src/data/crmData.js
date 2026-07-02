@@ -16,6 +16,14 @@ export const STATUSES = [
 ];
 
 export const SOURCES = ['Сайт', 'Telegram', 'WhatsApp', 'Instagram', 'VK', 'Email', 'Звонок', 'Реклама Яндекс'];
+
+// Уровень английского языка: три системы тестирования и их шкалы (по ТЗ).
+// EET: 1.0 … 10.0 с шагом 0.5. IELTS: 5.5, 6.0. Duolingo: 80, 90, 100, 120.
+export const ENGLISH_SYSTEMS = {
+    EET: Array.from({ length: 19 }, (_, i) => (1 + i * 0.5).toFixed(1)),
+    IELTS: ['5.5', '6.0'],
+    DUOLINGO: ['80', '90', '100', '120'],
+};
 export const PROGRAMS = ['Бизнес-администрирование', 'Информационные технологии', 'Финансы и банковское дело', 'Маркетинг', 'Право', 'Бухгалтерский учёт'];
 export const MANAGERS = ['АК', 'ДО', 'СИ'];
 export const MANAGER_NAMES = ['Алина Кравцова', 'Денис Орлов', 'Сабина Ибрагимова'];
@@ -30,7 +38,21 @@ export function randEl(arr) { return arr[Math.floor(Math.random() * arr.length)]
 export function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
 export function getInitials(name) { return name.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase(); }
 
-export function getStatusObj(key) { return STATUSES.find(s => s.key === key) || STATUSES[0]; }
+// Живой список этапов из pipeline_stages (заполняется StagesContext). Нужен,
+// чтобы getStatusObj находил и КАСТОМНЫЕ этапы (с ключом stage-<id>), а не
+// молча откатывался на первый стандартный.
+let DYNAMIC_STAGES = null;
+export function setDynamicStages(list) {
+    DYNAMIC_STAGES = Array.isArray(list) && list.length > 0 ? list : null;
+}
+
+export function getStatusObj(key) {
+    if (DYNAMIC_STAGES) {
+        const found = DYNAMIC_STAGES.find(s => s.key === key);
+        if (found) return found;
+    }
+    return STATUSES.find(s => s.key === key) || (DYNAMIC_STAGES && DYNAMIC_STAGES[0]) || STATUSES[0];
+}
 
 function generateInteractions(n) {
     const types = [

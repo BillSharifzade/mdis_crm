@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"crm_backend/internal/model"
@@ -24,14 +26,14 @@ func (r *TelegramChatRepository) GetByChatID(ctx context.Context, chatID int64) 
 	row := r.db.Pool.QueryRow(ctx, `
 		SELECT id, chat_id, lead_id, bot_state, bot_active,
 		       COALESCE(tg_username, ''), COALESCE(tg_first_name, ''),
-		       COALESCE(collected_name, ''), COALESCE(collected_program, ''), COALESCE(collected_phone, ''),
+		       COALESCE(collected_name, ''), COALESCE(collected_program, ''), COALESCE(collected_english, ''), COALESCE(collected_phone, ''),
 		       created_at, updated_at
 		FROM telegram_chats WHERE chat_id = $1
 	`, chatID)
 	var c model.TelegramChat
 	err := row.Scan(&c.ID, &c.ChatID, &c.LeadID, &c.BotState, &c.BotActive,
 		&c.TGUsername, &c.TGFirstName,
-		&c.CollectedName, &c.CollectedProgram, &c.CollectedPhone,
+		&c.CollectedName, &c.CollectedProgram, &c.CollectedEnglish, &c.CollectedPhone,
 		&c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -46,7 +48,7 @@ func (r *TelegramChatRepository) GetByLeadID(ctx context.Context, leadID int) (*
 	row := r.db.Pool.QueryRow(ctx, `
 		SELECT id, chat_id, lead_id, bot_state, bot_active,
 		       COALESCE(tg_username, ''), COALESCE(tg_first_name, ''),
-		       COALESCE(collected_name, ''), COALESCE(collected_program, ''), COALESCE(collected_phone, ''),
+		       COALESCE(collected_name, ''), COALESCE(collected_program, ''), COALESCE(collected_english, ''), COALESCE(collected_phone, ''),
 		       created_at, updated_at
 		FROM telegram_chats WHERE lead_id = $1
 		ORDER BY id DESC LIMIT 1
@@ -54,7 +56,7 @@ func (r *TelegramChatRepository) GetByLeadID(ctx context.Context, leadID int) (*
 	var c model.TelegramChat
 	err := row.Scan(&c.ID, &c.ChatID, &c.LeadID, &c.BotState, &c.BotActive,
 		&c.TGUsername, &c.TGFirstName,
-		&c.CollectedName, &c.CollectedProgram, &c.CollectedPhone,
+		&c.CollectedName, &c.CollectedProgram, &c.CollectedEnglish, &c.CollectedPhone,
 		&c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -78,7 +80,7 @@ func (r *TelegramChatRepository) Create(ctx context.Context, chatID int64, usern
 	`, chatID, model.BotStateGreet, username, firstName, now).Scan(
 		&c.ID, &c.ChatID, &c.LeadID, &c.BotState, &c.BotActive,
 		&c.TGUsername, &c.TGFirstName,
-		&c.CollectedName, &c.CollectedProgram, &c.CollectedPhone,
+		&c.CollectedName, &c.CollectedProgram, &c.CollectedEnglish, &c.CollectedPhone,
 		&c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("telegram_chats create: %w", err)
@@ -136,8 +138,39 @@ func (r *TelegramChatRepository) UnreadByLead(ctx context.Context) (map[int]int,
 	return out, nil
 }
 
+// GetPollOffset читает сохранённый getUpdates-offset из app_state. Нужен, чтобы
+// после РЕСТАРТА бэкенда бот не переигрывал уже обработанные апдейты заново
+// (иначе Telegram переотдаёт неподтверждённый бэклог → дублирующиеся ответы,
+// повторные «как вас зовут?» и рассинхрон состояния диалога).
+func (r *TelegramChatRepository) GetPollOffset(ctx context.Context) (int, error) {
+	var val string
+	err := r.db.Pool.QueryRow(ctx,
+		`SELECT value FROM app_state WHERE key = 'telegram_poll_offset'`).Scan(&val)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	n, convErr := strconv.Atoi(strings.TrimSpace(val))
+	if convErr != nil {
+		return 0, nil
+	}
+	return n, nil
+}
+
+// SetPollOffset сохраняет обработанный offset. Вызывается после каждого апдейта.
+func (r *TelegramChatRepository) SetPollOffset(ctx context.Context, offset int) error {
+	_, err := r.db.Pool.Exec(ctx, `
+		INSERT INTO app_state (key, value, updated_at)
+		VALUES ('telegram_poll_offset', $1, NOW())
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+	`, strconv.Itoa(offset))
+	return err
+}
+
 func (r *TelegramChatRepository) SetCollected(ctx context.Context, id int, field, value string) error {
-	allowed := map[string]bool{"collected_name": true, "collected_program": true, "collected_phone": true}
+	allowed := map[string]bool{"collected_name": true, "collected_program": true, "collected_english": true, "collected_phone": true}
 	if !allowed[field] {
 		return fmt.Errorf("unknown field: %s", field)
 	}
