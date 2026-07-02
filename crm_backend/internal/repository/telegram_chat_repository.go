@@ -75,7 +75,7 @@ func (r *TelegramChatRepository) Create(ctx context.Context, chatID int64, usern
 		VALUES ($1, $2, TRUE, $3, $4, $5, $5)
 		RETURNING id, chat_id, lead_id, bot_state, bot_active,
 		          COALESCE(tg_username, ''), COALESCE(tg_first_name, ''),
-		          COALESCE(collected_name, ''), COALESCE(collected_program, ''), COALESCE(collected_phone, ''),
+		          COALESCE(collected_name, ''), COALESCE(collected_program, ''), COALESCE(collected_english, ''), COALESCE(collected_phone, ''),
 		          created_at, updated_at
 	`, chatID, model.BotStateGreet, username, firstName, now).Scan(
 		&c.ID, &c.ChatID, &c.LeadID, &c.BotState, &c.BotActive,
