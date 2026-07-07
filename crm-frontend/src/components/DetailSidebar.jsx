@@ -7,6 +7,7 @@ import CallModal from './CallModal';
 import { useUsers } from '../context/useUsers';
 import { usePrograms } from '../context/usePrograms';
 import { useStages } from '../context/useStages';
+import { useSources } from '../context/useSources';
 
 const iconMap = {
     'phone': Phone,
@@ -413,6 +414,7 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
 }
 
 function EditLeadModal({ lead, users, programs, onClose, onSave }) {
+    const { options: sourceOptions } = useSources();
     const eligibleManagers = users.filter(u => u.role === 'admin' || u.role === 'admissions');
     const programOptions = programs && programs.length > 0
         ? programs.map(p => ({ id: p.id, name: p.name }))
@@ -466,6 +468,7 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
             englishLevel,
             program: chosenProgram?.name || lead.program,
             programId: chosenProgram?.id > 0 ? chosenProgram.id : null,
+            sourceId: sourceOptions.find(o => o.label === form.source)?.id ?? null,
             paymentStatus: form.paymentStatus,
             workCompany: showMba ? form.workCompany.trim() : '',
             workPosition: showMba ? form.workPosition.trim() : '',
@@ -506,7 +509,7 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
                             <div className="form-group">
                                 <label>Источник</label>
                                 <select value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}>
-                                    {SOURCES.map(s => <option key={s}>{s}</option>)}
+                                    {(sourceOptions.length ? sourceOptions.map(o => o.label) : SOURCES).map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                             </div>
                             <div className="form-group">

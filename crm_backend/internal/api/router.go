@@ -104,6 +104,7 @@ func (r *Router) InitRoutes() http.Handler {
 	programHandler := NewProgramHandler(programRepo)
 	settingsHandler := NewSettingsHandler(settingsRepo, botSettingsRepo)
 	stagesPublicHandler := NewStagesPublicHandler(settingsRepo)
+	sourcesPublicHandler := NewSourcesPublicHandler(settingsRepo)
 	importHandler := NewImportHandler(leadSvc, settingsRepo)
 	eventsHandler := NewEventsHandler(eventBus)
 	kpiHandler := NewKPIHandler(kpiRepo)
@@ -173,6 +174,9 @@ func (r *Router) InitRoutes() http.Handler {
 			// Публичный (для всех залогиненных) read-only список этапов воронки.
 			// Полный CRUD остаётся под /settings/stages (admin).
 			protected.Get("/stages", stagesPublicHandler.List)
+			// Read-only список источников обращения (для форм создания/редактирования
+			// лида) — доступен всем ролям. CRUD остаётся под /settings/sources (admin).
+			protected.Get("/sources", sourcesPublicHandler.List)
 			// Слим read-only список назначаемых менеджеров (id/name/role) для
 			// выпадающих списков назначения лида. Доступно всем залогиненным
 			// ролям; полный /users CRUD остаётся admin-only.

@@ -218,13 +218,14 @@ func (r *LeadRepository) Update(ctx context.Context, leadID int, req *model.Upda
 		    payment_status = COALESCE($10, payment_status),
 		    work_company = COALESCE($11, work_company),
 		    work_position = COALESCE($12, work_position),
-		    updated_at = $13
-		WHERE id = $14
+		    source_id = COALESCE($13, source_id),
+		    updated_at = $14
+		WHERE id = $15
 	`
 	_, err := r.db.Pool.Exec(ctx, query,
 		req.FirstName, req.LastName, req.Email, req.Phone,
 		req.ProgramID, req.AssigneeID, req.UTMSource, req.SocialURL, req.EnglishLevel,
-		req.PaymentStatus, req.WorkCompany, req.WorkPosition,
+		req.PaymentStatus, req.WorkCompany, req.WorkPosition, req.SourceID,
 		time.Now(), leadID,
 	)
 	if err != nil {

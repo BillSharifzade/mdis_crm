@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import TelegramChatModal from '../components/TelegramChatModal';
 import CallModal from '../components/CallModal';
 import { useUsers } from '../context/useUsers';
+import { useSources } from '../context/useSources';
 
 const PAGE_SIZE = 12;
 
@@ -12,6 +13,7 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
     const canEdit = role !== 'guest';
     const canManage = role === 'admin' || role === 'admissions';
     const { users, byId: usersById } = useUsers();
+    const { options: sourceOptions } = useSources();
     // Гостей нельзя назначать менеджерами — исключаем из фильтра.
     // Никаких выдуманных «запасных» менеджеров: показываем только реальных.
     const managerOptions = users.filter(u => u.role === 'admin' || u.role === 'admissions');
@@ -146,7 +148,7 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
                 </select>
                 <select className="filter-select" value={filterSource} onChange={e => { setFilterSource(e.target.value); setCurrentPage(1); }}>
                     <option value="">Все источники</option>
-                    {SOURCES.map(s => <option key={s}>{s}</option>)}
+                    {(sourceOptions.length ? sourceOptions.map(o => o.label) : SOURCES).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <select className="filter-select" value={filterManager} onChange={e => { setFilterManager(e.target.value); setCurrentPage(1); }}>
                     <option value="">Все менеджеры</option>

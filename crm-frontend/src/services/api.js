@@ -58,6 +58,10 @@ const SOURCE_LABELS = {
     campus_visit: 'Кампус-визит',
 };
 
+// Человекочитаемая подпись источника: известные коды → RU-подпись, кастомные
+// (заведённые админом) показываем как есть.
+export const sourceLabel = (name) => SOURCE_LABELS[name] || name || 'Сайт';
+
 export const mapServerToClientLead = (serverLead) => {
     const fullName = `${serverLead.first_name || ''} ${serverLead.last_name || ''}`.trim() || 'Без имени';
     const created = serverLead.created_at ? new Date(serverLead.created_at) : new Date();
@@ -230,7 +234,9 @@ export const api = {
 
     createLead: async (clientLeadData) => {
         const names = (clientLeadData.name || '').trim().split(/\s+/);
-        const sourceKey = Object.keys(SOURCE_LABELS).find(k => SOURCE_LABELS[k] === clientLeadData.source) || 'site';
+        // Код источника: известную подпись сворачиваем в код, кастомную оставляем
+        // как есть (не теряем админские источники, свалив всё в 'site').
+        const sourceKey = Object.keys(SOURCE_LABELS).find(k => SOURCE_LABELS[k] === clientLeadData.source) || clientLeadData.source || 'site';
         const serverPayload = {
             first_name: names[0] || 'Новый',
             last_name: names.slice(1).join(' '),
@@ -240,6 +246,7 @@ export const api = {
             utm_medium: 'referral',
             utm_campaign: 'none',
         };
+        if (clientLeadData.sourceId) serverPayload.source_id = clientLeadData.sourceId;
         if (clientLeadData.programId) serverPayload.program_id = clientLeadData.programId;
         if (clientLeadData.socialUrl) serverPayload.social_url = clientLeadData.socialUrl;
         if (clientLeadData.englishLevel) serverPayload.english_level = clientLeadData.englishLevel;
@@ -305,7 +312,7 @@ export const api = {
 
     updateLead: async (id, clientLead) => {
         const names = (clientLead.name || '').trim().split(/\s+/);
-        const sourceKey = Object.keys(SOURCE_LABELS).find(k => SOURCE_LABELS[k] === clientLead.source) || 'site';
+        const sourceKey = Object.keys(SOURCE_LABELS).find(k => SOURCE_LABELS[k] === clientLead.source) || clientLead.source || 'site';
         const payload = {
             first_name: names[0] || '—',
             last_name: names.slice(1).join(' '),
@@ -313,6 +320,7 @@ export const api = {
             phone: clientLead.phone || '',
             utm_source: sourceKey,
         };
+        if (clientLead.sourceId != null) payload.source_id = clientLead.sourceId;
         if (clientLead.assigneeId != null) payload.assignee_id = clientLead.assigneeId;
         if (clientLead.programId != null) payload.program_id = clientLead.programId;
         if (clientLead.socialUrl !== undefined) payload.social_url = clientLead.socialUrl;
@@ -338,6 +346,14 @@ export const api = {
 
     getPrograms: async () => {
         const response = await fetchWithAuth(`/programs`);
+        const data = await handleResponse(response);
+        return Array.isArray(data) ? data : [];
+    },
+
+    // Живой список источников обращения (для всех ролей). Отличается от admin-only
+    // listSources — этот доступен и менеджерам при создании лида.
+    getSources: async () => {
+        const response = await fetchWithAuth(`/sources`);
         const data = await handleResponse(response);
         return Array.isArray(data) ? data : [];
     },

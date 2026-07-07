@@ -46,7 +46,7 @@ export function academicYear(dateLike) {
 // EET: 1.0 … 10.0 с шагом 0.5. IELTS: 5.5, 6.0. Duolingo: 80, 90, 100, 120.
 export const ENGLISH_SYSTEMS = {
     EET: Array.from({ length: 19 }, (_, i) => (1 + i * 0.5).toFixed(1)),
-    IELTS: ['5.5', '6.0'],
+    IELTS: ['5.5', '6.0', '6.5', '7.0', '7.5', '8.0', '8.5', '9.0', '9.5', '10.0'],
     DUOLINGO: ['80', '90', '100', '120'],
 };
 export const PROGRAMS = ['Бизнес-администрирование', 'Информационные технологии', 'Финансы и банковское дело', 'Маркетинг', 'Право', 'Бухгалтерский учёт', 'Masters of Business Administration (MBA)', 'English for Professionals', 'Other'];

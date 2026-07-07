@@ -76,6 +76,7 @@ type UpdateLeadRequest struct {
 	Phone        string  `json:"phone"`
 	ProgramID    *int    `json:"program_id,omitempty"`
 	AssigneeID   *int    `json:"assignee_id,omitempty"`
+	SourceID     *int    `json:"source_id,omitempty"`
 	UTMSource    string  `json:"utm_source,omitempty"`
 	SocialURL    *string `json:"social_url,omitempty"`
 	EnglishLevel *string `json:"english_level,omitempty"`

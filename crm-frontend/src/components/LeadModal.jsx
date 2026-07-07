@@ -3,10 +3,12 @@ import { X, Save } from 'lucide-react';
 import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, PAYMENT_STATUSES, AVATAR_COLORS, randEl, getInitials, isMbaProgram } from '../data/crmData';
 import { useUsers } from '../context/useUsers';
 import { usePrograms } from '../context/usePrograms';
+import { useSources } from '../context/useSources';
 
 export default function LeadModal({ onClose, onSave, showToast }) {
     const { users } = useUsers();
     const { programs } = usePrograms();
+    const { options: sourceOptions } = useSources();
     // Только реальные менеджеры; пусто — значит назначение уйдёт на round-robin.
     const managerOptions = users.filter(u => u.role === 'admin' || u.role === 'admissions');
     const programOptions = programs.length > 0
@@ -56,6 +58,7 @@ export default function LeadModal({ onClose, onSave, showToast }) {
             phone: form.phone,
             email: form.email,
             source: form.source,
+            sourceId: sourceOptions.find(o => o.label === form.source)?.id ?? null,
             program: selectedProgram?.name || '',
             programId: selectedProgram?.id > 0 ? selectedProgram.id : null,
             assigneeId: selectedManager?.id > 0 ? selectedManager.id : null,
@@ -99,7 +102,7 @@ export default function LeadModal({ onClose, onSave, showToast }) {
                         <div className="form-group">
                             <label>Источник обращения</label>
                             <select value={form.source} onChange={e => handleChange('source', e.target.value)}>
-                                {SOURCES.map(s => <option key={s}>{s}</option>)}
+                                {(sourceOptions.length ? sourceOptions.map(o => o.label) : SOURCES).map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
                         <div className="form-group">

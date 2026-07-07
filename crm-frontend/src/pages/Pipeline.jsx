@@ -3,10 +3,12 @@ import { Filter, Plus, X } from 'lucide-react';
 import { SOURCES } from '../data/crmData';
 import { useStages } from '../context/useStages';
 import { useUsers } from '../context/useUsers';
+import { useSources } from '../context/useSources';
 
 export default function Pipeline({ allLeads, openDetail, openModal, onStatusChange, role }) {
     const { stages: stagesFromCtx } = useStages();
     const { users, byId: usersById } = useUsers();
+    const { options: sourceOptions } = useSources();
     const stages = stagesFromCtx && stagesFromCtx.length > 0 ? stagesFromCtx : [];
     const [dragId, setDragId] = useState(null);
     const [overKey, setOverKey] = useState(null);
@@ -99,7 +101,7 @@ export default function Pipeline({ allLeads, openDetail, openModal, onStatusChan
                 <div className="filters-row" style={{ marginBottom: 14 }}>
                     <select className="filter-select" value={filterSource} onChange={e => setFilterSource(e.target.value)}>
                         <option value="">Все источники</option>
-                        {SOURCES.map(s => <option key={s}>{s}</option>)}
+                        {(sourceOptions.length ? sourceOptions.map(o => o.label) : SOURCES).map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <select className="filter-select" value={filterManager} onChange={e => setFilterManager(e.target.value)}>
                         <option value="">Все менеджеры</option>

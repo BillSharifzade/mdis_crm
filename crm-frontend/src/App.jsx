@@ -21,6 +21,7 @@ import { useNotif } from './context/useNotif';
 import { UsersProvider } from './context/UsersContext';
 import { ProgramsProvider } from './context/ProgramsContext';
 import { StagesProvider } from './context/StagesContext';
+import { SourcesProvider } from './context/SourcesContext';
 import { openEventStream } from './services/eventStream';
 
 const USE_API = api.useApi;
@@ -439,6 +440,7 @@ function App() {
     <UsersProvider enabled={isAuthenticated}>
     <ProgramsProvider enabled={isAuthenticated}>
     <StagesProvider enabled={isAuthenticated}>
+    <SourcesProvider enabled={isAuthenticated}>
       <div className="bg-orb orb-1"></div>
       <div className="bg-orb orb-2"></div>
       <div className="bg-orb orb-3"></div>
@@ -540,6 +542,7 @@ function App() {
       />
 
       <ToastContainer toasts={toasts} />
+    </SourcesProvider>
     </StagesProvider>
     </ProgramsProvider>
     </UsersProvider>
