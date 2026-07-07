@@ -7,6 +7,7 @@ import Pipeline from './pages/Pipeline';
 import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import Archive from './pages/Archive';
 import MyKpi from './pages/MyKpi';
 import LeadModal from './components/LeadModal';
 import LeadImportModal from './components/LeadImportModal';
@@ -15,7 +16,6 @@ import DetailSidebar from './components/DetailSidebar';
 import NotifPanel from './components/NotifPanel';
 import ToastContainer from './components/ToastContainer';
 import Login from './pages/Login';
-import { getStatusObj } from './data/crmData';
 import { api, mapServerToClientLead, mapServerToClientInteraction, statusIdToKey } from './services/api';
 import { useNotif } from './context/useNotif';
 import { UsersProvider } from './context/UsersContext';
@@ -32,18 +32,19 @@ const PAGE_TITLES = {
   analytics: 'Аналитика',
   reports: 'Отчёты',
   mykpi: 'Мой KPI',
+  archive: 'Архив зачисленных',
   settings: 'Настройки',
 };
 
 const ROLE_PAGES = {
-  admin: ['dashboard', 'leads', 'pipeline', 'analytics', 'reports', 'mykpi', 'settings'],
+  admin: ['dashboard', 'leads', 'pipeline', 'analytics', 'reports', 'mykpi', 'archive', 'settings'],
   // Admissions работает с лидами и видит только свои показатели — без org-аналитики.
-  admissions: ['dashboard', 'leads', 'pipeline', 'mykpi'],
-  guest: ['dashboard', 'analytics', 'reports'],
+  admissions: ['dashboard', 'leads', 'pipeline', 'mykpi', 'archive'],
+  guest: ['dashboard', 'analytics', 'reports', 'archive'],
 };
 
 const PAGE_STORAGE_KEY = 'crm_current_page';
-const ALL_PAGES = ['dashboard', 'leads', 'pipeline', 'analytics', 'reports', 'mykpi', 'settings'];
+const ALL_PAGES = ['dashboard', 'leads', 'pipeline', 'analytics', 'reports', 'mykpi', 'archive', 'settings'];
 
 function App() {
   const [currentPage, setCurrentPage] = useState(() => {
@@ -67,7 +68,7 @@ function App() {
   const [globalSearch, setGlobalSearch] = useState('');
   const [unreadByLead, setUnreadByLead] = useState({});
 
-  const { push: pushNotif, unreadCount } = useNotif();
+  const { push: pushNotif, removeByLead, unreadCount } = useNotif();
 
   const role = (user && user.role) || 'admin';
   const allowedPages = ROLE_PAGES[role] || ROLE_PAGES.admin;
@@ -203,10 +204,24 @@ function App() {
         } else if (type === 'lead.deleted' && payload?.id) {
           setAllLeads(prev => prev.filter(l => l.id !== payload.id));
         } else if (type === 'lead.status_changed' && payload?.lead_id) {
+          // По ТЗ (#4) уведомления о смене статуса отключены — статус и так виден
+          // в таблице. Просто синхронизируем локальное состояние без notif.
           const statusKey = statusIdToKey(payload.new_status_id);
           setAllLeads(prev => prev.map(l => l.id === payload.lead_id ? { ...l, status: statusKey, refusalReason: payload.refusal_reason || l.refusalReason } : l));
-          const stObj = getStatusObj(statusKey);
-          pushNotif({ type: statusKey === 'enrolled' ? 'enrolled' : (statusKey === 'lost' ? 'lost' : 'status_change'), text: `Лид #${payload.lead_id} → <strong>${stObj.label}</strong>`, leadId: payload.lead_id });
+        } else if (type === 'reminder.due' && payload?.lead_id) {
+          // Напоминание показываем только ответственному менеджеру (или админу).
+          const mine = !user || user.role === 'admin' || payload.assignee_id == null || payload.assignee_id === user.id;
+          if (mine) {
+            const note = payload.reminder_note ? ` — ${payload.reminder_note}` : '';
+            pushNotif({
+              type: 'reminder',
+              text: `<strong>Напоминание:</strong> связаться с «${payload.name || 'лид #' + payload.lead_id}»${note}`,
+              leadId: payload.lead_id,
+              dedupeKey: `reminder-${payload.lead_id}`,
+            });
+          }
+        } else if (type === 'reminder.done' && payload?.lead_id) {
+          removeByLead(payload.lead_id);
         } else if (type === 'interaction.created' && payload?.lead_id) {
           const inter = mapServerToClientInteraction(payload);
           pushNotif({ type: 'interaction', text: `<strong>${inter.label}</strong> · лид #${payload.lead_id}`, leadId: payload.lead_id });
@@ -219,7 +234,7 @@ function App() {
       onError: (e) => console.warn('SSE closed', e),
     });
     return () => { if (stream) stream.close(); };
-  }, [isAuthenticated, pushNotif]);
+  }, [isAuthenticated, pushNotif, removeByLead, user]);
   // ─────────────────────────────────────────────────────────────────────
 
 
@@ -307,21 +322,9 @@ function App() {
       if (USE_API) {
         await api.updateLeadStatus(id, status, refusalReason);
       }
-      let leadName = '';
-      setAllLeads(prev => prev.map(l => {
-        if (l.id === id) {
-          leadName = l.name;
-          return { ...l, status, refusalReason };
-        }
-        return l;
-      }));
-      const stObj = getStatusObj(status);
-      const notifType = status === 'enrolled' ? 'enrolled' : (status === 'lost' ? 'lost' : 'status_change');
-      pushNotif({
-        type: notifType,
-        text: `<strong>${leadName || 'Лид'}</strong> → статус «${stObj.label}»${refusalReason ? ` (${refusalReason})` : ''}`,
-        leadId: id,
-      });
+      setAllLeads(prev => prev.map(l => l.id === id ? { ...l, status, refusalReason } : l));
+      // Уведомление о смене статуса не создаём (#4 ТЗ) — статус виден в таблице,
+      // а дубли «Новый лид»/«Лид №XX» только зашумляли панель.
       showToast('Статус обновлён', 'success');
       return true;
     } catch (error) {
@@ -329,7 +332,7 @@ function App() {
       showToast('Ошибка при обновлении статуса', 'error');
       return false;
     }
-  }, [showToast, pushNotif]);
+  }, [showToast]);
 
   const handleLogout = useCallback(() => {
     api.logout();
@@ -357,6 +360,15 @@ function App() {
 
   const openDetail = useCallback((lead) => {
     setDetailLead(lead);
+  }, []);
+
+  // Открыть карточку лида по id (используется кликом по уведомлению, #4 ТЗ).
+  const openLeadById = useCallback((leadId) => {
+    setAllLeads(prev => {
+      const found = prev.find(l => l.id === leadId);
+      if (found) setDetailLead(found);
+      return prev;
+    });
   }, []);
 
   const renderPage = () => {
@@ -399,6 +411,8 @@ function App() {
         return <Reports showToast={showToast} />;
       case 'mykpi':
         return <MyKpi user={user} showToast={showToast} />;
+      case 'archive':
+        return <Archive allLeads={allLeads} openDetail={openDetail} />;
       case 'settings':
         return <Settings allLeads={allLeads} showToast={showToast} role={role} />;
       default:
@@ -521,6 +535,8 @@ function App() {
       <NotifPanel
         isOpen={notifOpen}
         onClose={() => setNotifOpen(false)}
+        onOpenLead={openLeadById}
+        showToast={showToast}
       />
 
       <ToastContainer toasts={toasts} />

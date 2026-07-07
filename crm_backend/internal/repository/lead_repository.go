@@ -29,11 +29,15 @@ func (r *LeadRepository) Create(ctx context.Context, lead *model.CreateLeadReque
 		INSERT INTO leads (
 			first_name, last_name, email, phone, program_id,
 			utm_source, utm_medium, utm_campaign, source_id, status_id,
-			assignee_id, social_url, english_level, created_at, updated_at
+			assignee_id, social_url, english_level,
+			payment_status, reminder_at, reminder_note, work_company, work_position,
+			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9, $10,
-			$11, $12, $13, $14, $15
+			$11, $12, $13,
+			$14, $15, $16, $17, $18,
+			$19, $20
 		) RETURNING id, created_at, updated_at
 	`
 
@@ -46,7 +50,9 @@ func (r *LeadRepository) Create(ctx context.Context, lead *model.CreateLeadReque
 	err := r.db.Pool.QueryRow(ctx, query,
 		lead.FirstName, lead.LastName, lead.Email, lead.Phone, lead.ProgramID,
 		lead.UTMSource, lead.UTMMedium, lead.UTMCampaign, sourceID, statusID,
-		lead.AssigneeID, nullStr(lead.SocialURL), nullStr(lead.EnglishLevel), now, now,
+		lead.AssigneeID, nullStr(lead.SocialURL), nullStr(lead.EnglishLevel),
+		lead.PaymentStatus, lead.ReminderAt, nullStr(lead.ReminderNote), nullStr(lead.WorkCompany), nullStr(lead.WorkPosition),
+		now, now,
 	).Scan(&newLead.ID, &newLead.CreatedAt, &newLead.UpdatedAt)
 
 	if err != nil {
@@ -66,6 +72,11 @@ func (r *LeadRepository) Create(ctx context.Context, lead *model.CreateLeadReque
 	newLead.AssigneeID = lead.AssigneeID
 	newLead.SocialURL = lead.SocialURL
 	newLead.EnglishLevel = lead.EnglishLevel
+	newLead.PaymentStatus = lead.PaymentStatus
+	newLead.ReminderAt = lead.ReminderAt
+	newLead.ReminderNote = lead.ReminderNote
+	newLead.WorkCompany = lead.WorkCompany
+	newLead.WorkPosition = lead.WorkPosition
 
 	return &newLead, nil
 }
@@ -98,6 +109,10 @@ func (r *LeadRepository) GetByID(ctx context.Context, id int) (*model.Lead, erro
 			COALESCE(l.social_url, ''),
 			COALESCE(l.english_level, ''),
 			COALESCE(p.name, ''),
+			COALESCE(l.payment_status, ''),
+			l.reminder_at, COALESCE(l.reminder_note, ''), l.reminder_done,
+			COALESCE(l.work_company, ''), COALESCE(l.work_position, ''),
+			l.enrolled_at,
 			l.created_at, l.updated_at
 		FROM leads l
 		LEFT JOIN contacts c ON l.contact_id = c.id
@@ -113,6 +128,10 @@ func (r *LeadRepository) GetByID(ctx context.Context, id int) (*model.Lead, erro
 		&lead.SocialURL,
 		&lead.EnglishLevel,
 		&lead.ProgramName,
+		&lead.PaymentStatus,
+		&lead.ReminderAt, &lead.ReminderNote, &lead.ReminderDone,
+		&lead.WorkCompany, &lead.WorkPosition,
+		&lead.EnrolledAt,
 		&lead.CreatedAt, &lead.UpdatedAt,
 	)
 	if err != nil {
@@ -122,12 +141,69 @@ func (r *LeadRepository) GetByID(ctx context.Context, id int) (*model.Lead, erro
 }
 
 func (r *LeadRepository) UpdateStatus(ctx context.Context, leadID int, statusID int) error {
-	query := `UPDATE leads SET status_id = $1, updated_at = $2 WHERE id = $3`
+	// При переходе в «Зачисление» (id=6) фиксируем момент зачисления один раз —
+	// на нём строится архив зачисленных студентов по учебным годам (#7).
+	query := `
+		UPDATE leads
+		SET status_id = $1,
+		    updated_at = $2,
+		    enrolled_at = CASE WHEN $1 = 6 THEN COALESCE(enrolled_at, $2) ELSE enrolled_at END
+		WHERE id = $3`
 	_, err := r.db.Pool.Exec(ctx, query, statusID, time.Now(), leadID)
 	if err != nil {
 		return fmt.Errorf("failed to update lead status: %w", err)
 	}
 	return nil
+}
+
+// ── Напоминания (#3) ──────────────────────────────────────────────────────
+
+// DueReminder — компактная строка для рассылки уведомлений о напоминаниях.
+type DueReminder struct {
+	LeadID     int
+	Name       string
+	AssigneeID *int
+	Email      string
+	ReminderAt time.Time
+	Note       string
+}
+
+// DueReminders возвращает лиды, у которых наступил срок напоминания и о нём
+// ещё не уведомляли (reminder_notified = FALSE) и оно не закрыто.
+func (r *LeadRepository) DueReminders(ctx context.Context) ([]DueReminder, error) {
+	rows, err := r.db.Pool.Query(ctx, `
+		SELECT id, TRIM(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')),
+		       assignee_id, COALESCE(email,''), reminder_at, COALESCE(reminder_note,'')
+		FROM leads
+		WHERE reminder_at IS NOT NULL
+		  AND reminder_done = FALSE
+		  AND reminder_notified = FALSE
+		  AND reminder_at <= NOW()
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DueReminder
+	for rows.Next() {
+		var d DueReminder
+		if err := rows.Scan(&d.LeadID, &d.Name, &d.AssigneeID, &d.Email, &d.ReminderAt, &d.Note); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+func (r *LeadRepository) MarkReminderNotified(ctx context.Context, leadID int) error {
+	_, err := r.db.Pool.Exec(ctx, `UPDATE leads SET reminder_notified = TRUE WHERE id = $1`, leadID)
+	return err
+}
+
+// CompleteReminder закрывает напоминание (кнопка «Выполнено» у менеджера).
+func (r *LeadRepository) CompleteReminder(ctx context.Context, leadID int) error {
+	_, err := r.db.Pool.Exec(ctx, `UPDATE leads SET reminder_done = TRUE WHERE id = $1`, leadID)
+	return err
 }
 
 func (r *LeadRepository) Update(ctx context.Context, leadID int, req *model.UpdateLeadRequest) error {
@@ -139,16 +215,32 @@ func (r *LeadRepository) Update(ctx context.Context, leadID int, req *model.Upda
 		    utm_source = COALESCE($7, utm_source),
 		    social_url = COALESCE($8, social_url),
 		    english_level = COALESCE($9, english_level),
-		    updated_at = $10
-		WHERE id = $11
+		    payment_status = COALESCE($10, payment_status),
+		    work_company = COALESCE($11, work_company),
+		    work_position = COALESCE($12, work_position),
+		    updated_at = $13
+		WHERE id = $14
 	`
 	_, err := r.db.Pool.Exec(ctx, query,
 		req.FirstName, req.LastName, req.Email, req.Phone,
 		req.ProgramID, req.AssigneeID, req.UTMSource, req.SocialURL, req.EnglishLevel,
+		req.PaymentStatus, req.WorkCompany, req.WorkPosition,
 		time.Now(), leadID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update lead: %w", err)
+	}
+
+	// Напоминание (#3): либо снимаем, либо (пере)устанавливаем — тогда сбрасываем
+	// флаги доставки/выполнения, чтобы новое напоминание сработало заново.
+	if req.ClearReminder {
+		_, _ = r.db.Pool.Exec(ctx, `UPDATE leads SET reminder_at = NULL, reminder_note = NULL, reminder_done = FALSE, reminder_notified = FALSE WHERE id = $1`, leadID)
+	} else if req.ReminderAt != nil {
+		var note interface{}
+		if req.ReminderNote != nil {
+			note = nullStr(*req.ReminderNote)
+		}
+		_, _ = r.db.Pool.Exec(ctx, `UPDATE leads SET reminder_at = $1, reminder_note = $2, reminder_done = FALSE, reminder_notified = FALSE WHERE id = $3`, *req.ReminderAt, note, leadID)
 	}
 	if req.ContactID != nil && req.Email != "" {
 		_, _ = r.db.Pool.Exec(ctx, `UPDATE contacts SET first_name = $1, last_name = $2, email = $3, phone = $4, updated_at = $5 WHERE id = $6`,
@@ -195,6 +287,10 @@ func (r *LeadRepository) List(ctx context.Context, limit, offset int) ([]model.L
 			COALESCE(l.social_url, ''),
 			COALESCE(l.english_level, ''),
 			COALESCE(p.name, ''),
+			COALESCE(l.payment_status, ''),
+			l.reminder_at, COALESCE(l.reminder_note, ''), l.reminder_done,
+			COALESCE(l.work_company, ''), COALESCE(l.work_position, ''),
+			l.enrolled_at,
 			l.created_at, l.updated_at
 		FROM leads l
 		LEFT JOIN contacts c ON l.contact_id = c.id
@@ -218,6 +314,10 @@ func (r *LeadRepository) List(ctx context.Context, limit, offset int) ([]model.L
 			&lead.SocialURL,
 			&lead.EnglishLevel,
 			&lead.ProgramName,
+			&lead.PaymentStatus,
+			&lead.ReminderAt, &lead.ReminderNote, &lead.ReminderDone,
+			&lead.WorkCompany, &lead.WorkPosition,
+			&lead.EnrolledAt,
 			&lead.CreatedAt, &lead.UpdatedAt,
 		)
 		if err != nil {

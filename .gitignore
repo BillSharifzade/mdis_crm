@@ -47,6 +47,8 @@ Thumbs.db
 # Импортируемые данные клиента — не коммитим PII.
 База лидов_*.xlsx
 *.xlsx
+*.doc
+*.docx
 
 # Claude Code memory / local settings
 .claude/

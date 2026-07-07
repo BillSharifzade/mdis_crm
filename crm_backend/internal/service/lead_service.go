@@ -153,6 +153,54 @@ func (s *LeadService) MergeLeads(ctx context.Context, targetLeadID, sourceLeadID
 	return s.leadRepo.MergeLeads(ctx, targetLeadID, sourceLeadID)
 }
 
+// CompleteReminder закрывает напоминание по лиду (кнопка «Выполнено» у менеджера, #3/#4).
+func (s *LeadService) CompleteReminder(ctx context.Context, leadID int) error {
+	if err := s.leadRepo.CompleteReminder(ctx, leadID); err != nil {
+		return err
+	}
+	s.publish("reminder.done", map[string]interface{}{"lead_id": leadID})
+	return nil
+}
+
+// StartReminderScheduler раз в минуту ищет наступившие напоминания и рассылает
+// SSE-событие reminder.due ответственному менеджеру (#3). Каждое напоминание
+// «стреляет» один раз (reminder_notified), пока менеджер не отметит «Выполнено».
+func (s *LeadService) StartReminderScheduler(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		s.scanDueReminders(ctx)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.scanDueReminders(ctx)
+			}
+		}
+	}()
+}
+
+func (s *LeadService) scanDueReminders(ctx context.Context) {
+	due, err := s.leadRepo.DueReminders(ctx)
+	if err != nil {
+		fmt.Printf("[REMINDER] scan error: %v\n", err)
+		return
+	}
+	for _, d := range due {
+		s.publish("reminder.due", map[string]interface{}{
+			"lead_id":       d.LeadID,
+			"name":          d.Name,
+			"assignee_id":   d.AssigneeID,
+			"reminder_at":   d.ReminderAt,
+			"reminder_note": d.Note,
+		})
+		if err := s.leadRepo.MarkReminderNotified(ctx, d.LeadID); err != nil {
+			fmt.Printf("[REMINDER] mark notified lead %d: %v\n", d.LeadID, err)
+		}
+	}
+}
+
 func (s *LeadService) UpdateLead(ctx context.Context, leadID int, req *model.UpdateLeadRequest) (*model.Lead, error) {
 	existing, err := s.leadRepo.GetByID(ctx, leadID)
 	if err != nil {

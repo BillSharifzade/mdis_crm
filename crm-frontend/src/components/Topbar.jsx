@@ -29,9 +29,15 @@ export default function Topbar({ breadcrumb, onMenuToggle, onNotifToggle, onSear
                         />
                     </div>
                 )}
-                <button className="topbar-btn" onClick={onNotifToggle}>
-                    <Bell size={16} />
-                    {unreadCount > 0 && <span className="notif-dot"></span>}
+                <button
+                    className={`topbar-btn notif-bell ${unreadCount > 0 ? 'has-unread' : ''}`}
+                    onClick={onNotifToggle}
+                    title={unreadCount > 0 ? `Непрочитанных: ${unreadCount}` : 'Уведомления'}
+                >
+                    <Bell size={19} />
+                    {unreadCount > 0 && (
+                        <span className="notif-count">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                    )}
                 </button>
             </div>
         </header>

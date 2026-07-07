@@ -31,11 +31,30 @@ export function NotifProvider({ children }) {
             unread: true,
             ...notif,
         };
-        setNotifs(prev => [entry, ...prev].slice(0, MAX_NOTIFS));
+        setNotifs(prev => {
+            // Дедупликация напоминаний: не плодим одинаковые уведомления по
+            // одному и тому же лиду (планировщик стреляет один раз, но SSE может
+            // переподключиться).
+            if (entry.dedupeKey) {
+                const filtered = prev.filter(n => n.dedupeKey !== entry.dedupeKey);
+                return [entry, ...filtered].slice(0, MAX_NOTIFS);
+            }
+            return [entry, ...prev].slice(0, MAX_NOTIFS);
+        });
     }, []);
 
     const markAllRead = useCallback(() => {
         setNotifs(prev => prev.map(n => ({ ...n, unread: false })));
+    }, []);
+
+    // Удаление одного уведомления (кнопки «Выполнено» / «Закрыть»).
+    const remove = useCallback((id) => {
+        setNotifs(prev => prev.filter(n => n.id !== id));
+    }, []);
+
+    // Убрать все уведомления по лиду (например, когда напоминание закрыто).
+    const removeByLead = useCallback((leadId) => {
+        setNotifs(prev => prev.filter(n => !(n.leadId === leadId && n.type === 'reminder')));
     }, []);
 
     const clearAll = useCallback(() => {
@@ -45,7 +64,7 @@ export function NotifProvider({ children }) {
     const unreadCount = notifs.filter(n => n.unread).length;
 
     return (
-        <NotifContext.Provider value={{ notifs, push, markAllRead, clearAll, unreadCount }}>
+        <NotifContext.Provider value={{ notifs, push, markAllRead, remove, removeByLead, clearAll, unreadCount }}>
             {children}
         </NotifContext.Provider>
     );

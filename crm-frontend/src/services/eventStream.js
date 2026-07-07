@@ -24,6 +24,8 @@ export function openEventStream({ onEvent, onError } = {}) {
         'lead.status_changed',
         'interaction.created',
         'telegram.message',
+        'reminder.due',
+        'reminder.done',
     ];
 
     KNOWN_EVENTS.forEach(type => {

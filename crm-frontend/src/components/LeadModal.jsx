@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Save } from 'lucide-react';
-import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, AVATAR_COLORS, randEl, getInitials } from '../data/crmData';
+import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, PAYMENT_STATUSES, AVATAR_COLORS, randEl, getInitials, isMbaProgram } from '../data/crmData';
 import { useUsers } from '../context/useUsers';
 import { usePrograms } from '../context/usePrograms';
 
@@ -21,8 +21,16 @@ export default function LeadModal({ onClose, onSave, showToast }) {
         socialUrl: '',
         englishSystem: '',
         englishScore: '',
+        paymentStatus: '',
+        workCompany: '',
+        workPosition: '',
+        reminderAt: '',
+        reminderNote: '',
         comment: ''
     });
+
+    const selectedProgramName = programOptions.find(p => p.id === form.programId)?.name || '';
+    const showMba = isMbaProgram(selectedProgramName);
 
     const handleChange = (field, value) => {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -53,6 +61,11 @@ export default function LeadModal({ onClose, onSave, showToast }) {
             assigneeId: selectedManager?.id > 0 ? selectedManager.id : null,
             socialUrl: form.socialUrl.trim(),
             englishLevel,
+            paymentStatus: form.paymentStatus,
+            workCompany: showMba ? form.workCompany.trim() : '',
+            workPosition: showMba ? form.workPosition.trim() : '',
+            reminderAt: form.reminderAt || '',
+            reminderNote: form.reminderNote.trim(),
             comment: form.comment.trim(),
             status: 'new',
             date: new Date(),
@@ -102,6 +115,24 @@ export default function LeadModal({ onClose, onSave, showToast }) {
                                 {managerOptions.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                             </select>
                         </div>
+                        <div className="form-group">
+                            <label>Статус оплаты</label>
+                            <select value={form.paymentStatus} onChange={e => handleChange('paymentStatus', e.target.value)}>
+                                {PAYMENT_STATUSES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+                            </select>
+                        </div>
+                        {showMba && (
+                            <>
+                                <div className="form-group">
+                                    <label>Компания (место работы)</label>
+                                    <input type="text" placeholder="Название компании" value={form.workCompany} onChange={e => handleChange('workCompany', e.target.value)} />
+                                </div>
+                                <div className="form-group">
+                                    <label>Должность</label>
+                                    <input type="text" placeholder="Должность" value={form.workPosition} onChange={e => handleChange('workPosition', e.target.value)} />
+                                </div>
+                            </>
+                        )}
                         <div className="form-group full-width">
                             <label>Ссылка на соцсеть (Instagram / VK / Facebook и т.п., кроме Telegram)</label>
                             <input
@@ -131,6 +162,14 @@ export default function LeadModal({ onClose, onSave, showToast }) {
                                 <option value="">{form.englishSystem ? '— выберите балл —' : '— сначала система —'}</option>
                                 {(ENGLISH_SYSTEMS[form.englishSystem] || []).map(v => <option key={v} value={v}>{v}</option>)}
                             </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Напомнить связаться (дата и время)</label>
+                            <input type="datetime-local" value={form.reminderAt} onChange={e => handleChange('reminderAt', e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label>Текст напоминания</label>
+                            <input type="text" placeholder="Напр.: перезвонить по следующему набору" value={form.reminderNote} onChange={e => handleChange('reminderNote', e.target.value)} disabled={!form.reminderAt} />
                         </div>
                         <div className="form-group full-width">
                             <label>Комментарий</label>

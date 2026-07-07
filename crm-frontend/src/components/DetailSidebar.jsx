@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Phone, MessageCircle, Mail, Pencil, Plus, Send, Trash2, Save, Link as LinkIcon } from 'lucide-react';
-import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, getStatusObj, formatHoursAgo } from '../data/crmData';
+import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, PAYMENT_STATUSES, getStatusObj, formatHoursAgo, paymentStatusLabel, isMbaProgram } from '../data/crmData';
 import { api, statusIdToKey } from '../services/api';
 import TelegramChatModal from './TelegramChatModal';
 import CallModal from './CallModal';
@@ -15,6 +15,15 @@ const iconMap = {
 };
 
 const REASON_OPTIONS = ['Высокая цена', 'Выбрал другой вуз', 'Не прошёл по баллам', 'Передумал', 'Нет ответа'];
+
+// ISO → значение для <input type="datetime-local"> (локальное время без TZ-суффикса).
+function toLocalInput(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate, onDelete, showToast, role = 'admin', onNotif }) {
     const { stages, byKey: stagesByKey } = useStages();
@@ -34,6 +43,7 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
     const [tgChatOpen, setTgChatOpen] = useState(false);
     const [callOpen, setCallOpen] = useState(false);
     const [editing, setEditing] = useState(false);
+    const [reminderClosed, setReminderClosed] = useState(false);
 
     const canEdit = role !== 'guest';
     const canManage = role === 'admin' || role === 'admissions';
@@ -177,7 +187,29 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
                             <div className="detail-field"><label>Дата заявки</label><span>{leadDate.toLocaleDateString('ru-RU')}</span></div>
                             <div className="detail-field"><label>Программа</label><span>{lead.program}</span></div>
                             <div className="detail-field"><label>Менеджер</label><span>{managerLabel}</span></div>
+                            <div className="detail-field"><label>Статус оплаты</label><span>{lead.paymentStatus ? paymentStatusLabel(lead.paymentStatus) : '—'}</span></div>
                             <div className="detail-field"><label>Английский</label><span>{lead.englishLevel || '—'}</span></div>
+                            {isMbaProgram(lead.program) && (
+                                <>
+                                    <div className="detail-field"><label>Компания</label><span>{lead.workCompany || '—'}</span></div>
+                                    <div className="detail-field"><label>Должность</label><span>{lead.workPosition || '—'}</span></div>
+                                </>
+                            )}
+                            {lead.reminderAt && !lead.reminderDone && !reminderClosed && (
+                                <div className="detail-field" style={{ gridColumn: 'span 2' }}>
+                                    <label>Напоминание связаться</label>
+                                    <span style={{ color: new Date(lead.reminderAt) <= new Date() ? '#f59e0b' : 'var(--text-primary)' }}>
+                                        {new Date(lead.reminderAt).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        {lead.reminderNote ? ` · ${lead.reminderNote}` : ''}
+                                        {' '}
+                                        <button
+                                            type="button"
+                                            onClick={async () => { if (api.useApi) { try { await api.completeReminder(lead.id); } catch { /* */ } } setReminderClosed(true); showToast('Напоминание закрыто', 'success'); }}
+                                            style={{ marginLeft: 6, fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--glass-border)', background: 'var(--glass)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                                        >Выполнено</button>
+                                    </span>
+                                </div>
+                            )}
                             <div className="detail-field" style={{ gridColumn: 'span 2' }}>
                                 <label>Соцсеть</label>
                                 <span>
@@ -405,8 +437,16 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
         socialUrl: lead.socialUrl || '',
         englishSystem: initialEnglishSystem,
         englishScore: initialEnglishScore,
+        paymentStatus: lead.paymentStatus || '',
+        workCompany: lead.workCompany || '',
+        workPosition: lead.workPosition || '',
+        reminderAt: toLocalInput(lead.reminderDone ? '' : lead.reminderAt),
+        reminderNote: lead.reminderDone ? '' : (lead.reminderNote || ''),
     });
     const [busy, setBusy] = useState(false);
+    const editProgramName = programOptions.find(p => p.id === form.programId)?.name || '';
+    const showMba = isMbaProgram(editProgramName);
+    const hadReminder = !!lead.reminderAt && !lead.reminderDone;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -420,13 +460,24 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
         const englishLevel = form.englishSystem && form.englishScore
             ? `${form.englishSystem} ${form.englishScore}`
             : '';
-        await onSave({
+        const patch = {
             ...form,
             socialUrl: form.socialUrl.trim(),
             englishLevel,
             program: chosenProgram?.name || lead.program,
             programId: chosenProgram?.id > 0 ? chosenProgram.id : null,
-        });
+            paymentStatus: form.paymentStatus,
+            workCompany: showMba ? form.workCompany.trim() : '',
+            workPosition: showMba ? form.workPosition.trim() : '',
+        };
+        // Напоминание: снятое поле → очистка, заполненное → (пере)установка.
+        if (!form.reminderAt && hadReminder) {
+            patch.clearReminder = true;
+        } else if (form.reminderAt) {
+            patch.reminderAt = form.reminderAt;
+            patch.reminderNote = form.reminderNote.trim();
+        }
+        await onSave(patch);
         setBusy(false);
     };
 
@@ -491,6 +542,32 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
                                     <option value="">{form.englishSystem ? '— выберите —' : '— система —'}</option>
                                     {(ENGLISH_SYSTEMS[form.englishSystem] || []).map(v => <option key={v} value={v}>{v}</option>)}
                                 </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Статус оплаты</label>
+                                <select value={form.paymentStatus} onChange={e => setForm({ ...form, paymentStatus: e.target.value })}>
+                                    {PAYMENT_STATUSES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+                                </select>
+                            </div>
+                            {showMba && (
+                                <>
+                                    <div className="form-group">
+                                        <label>Компания</label>
+                                        <input type="text" placeholder="Место работы" value={form.workCompany} onChange={e => setForm({ ...form, workCompany: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Должность</label>
+                                        <input type="text" placeholder="Должность" value={form.workPosition} onChange={e => setForm({ ...form, workPosition: e.target.value })} />
+                                    </div>
+                                </>
+                            )}
+                            <div className="form-group">
+                                <label>Напомнить связаться</label>
+                                <input type="datetime-local" value={form.reminderAt} onChange={e => setForm({ ...form, reminderAt: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label>Текст напоминания</label>
+                                <input type="text" placeholder="Комментарий к напоминанию" value={form.reminderNote} onChange={e => setForm({ ...form, reminderNote: e.target.value })} disabled={!form.reminderAt} />
                             </div>
                             <div className="form-group full-width">
                                 <label>Соцсеть (URL)</label>

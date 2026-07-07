@@ -15,7 +15,32 @@ export const STATUSES = [
     { key: 'lost', label: 'Отказ', cls: 's-lost', color: '#ef4444' },
 ];
 
-export const SOURCES = ['Сайт', 'Telegram', 'WhatsApp', 'Instagram', 'VK', 'Email', 'Звонок', 'Реклама Яндекс'];
+export const SOURCES = ['Сайт', 'Telegram', 'WhatsApp', 'Instagram', 'VK', 'Email', 'Звонок', 'Реклама Яндекс', 'Кампус-визит'];
+
+// Способ оплаты (#1 ТЗ) — отдельное поле лида, НЕ этап воронки.
+export const PAYMENT_STATUSES = [
+    { key: '', label: '— не указан —' },
+    { key: 'self_payment', label: 'Self Payment' },
+    { key: 'sponsorship', label: 'Sponsorship' },
+];
+export function paymentStatusLabel(key) {
+    return (PAYMENT_STATUSES.find(p => p.key === key) || PAYMENT_STATUSES[0]).label;
+}
+
+// Программа MBA (#6 ТЗ): при её выборе показываем поля «место работы».
+export function isMbaProgram(name) {
+    return /\bMBA\b|master.*business administration/i.test(name || '');
+}
+
+// Учебный год для архива зачисленных (#7 ТЗ). Приём стартует осенью — год
+// считаем с сентября: до сентября относим к предыдущему набору.
+export function academicYear(dateLike) {
+    const d = dateLike instanceof Date ? dateLike : new Date(dateLike);
+    if (isNaN(d.getTime())) return '—';
+    const y = d.getFullYear();
+    const start = d.getMonth() >= 8 ? y : y - 1; // месяцы 0-based, 8 = сентябрь
+    return `${start}–${start + 1}`;
+}
 
 // Уровень английского языка: три системы тестирования и их шкалы (по ТЗ).
 // EET: 1.0 … 10.0 с шагом 0.5. IELTS: 5.5, 6.0. Duolingo: 80, 90, 100, 120.
@@ -24,7 +49,7 @@ export const ENGLISH_SYSTEMS = {
     IELTS: ['5.5', '6.0'],
     DUOLINGO: ['80', '90', '100', '120'],
 };
-export const PROGRAMS = ['Бизнес-администрирование', 'Информационные технологии', 'Финансы и банковское дело', 'Маркетинг', 'Право', 'Бухгалтерский учёт'];
+export const PROGRAMS = ['Бизнес-администрирование', 'Информационные технологии', 'Финансы и банковское дело', 'Маркетинг', 'Право', 'Бухгалтерский учёт', 'Masters of Business Administration (MBA)', 'English for Professionals', 'Other'];
 export const MANAGERS = ['АК', 'ДО', 'СИ'];
 export const MANAGER_NAMES = ['Алина Кравцова', 'Денис Орлов', 'Сабина Ибрагимова'];
 export const MANAGER_COLORS = ['#6366f1', '#10b981', '#f59e0b'];

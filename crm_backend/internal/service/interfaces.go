@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"crm_backend/internal/model"
+	"crm_backend/internal/repository"
 )
 
 // ---- Repository Interfaces ----
@@ -22,6 +23,9 @@ type LeadRepository interface {
 	GetLastAssignedManagerID(ctx context.Context) (int, error)
 	UpdateLastAssignedManagerID(ctx context.Context, id int) error
 	FindByContactID(ctx context.Context, contactID int) (*model.Lead, error)
+	DueReminders(ctx context.Context) ([]repository.DueReminder, error)
+	MarkReminderNotified(ctx context.Context, leadID int) error
+	CompleteReminder(ctx context.Context, leadID int) error
 }
 
 type ContactRepository interface {
@@ -71,6 +75,7 @@ type ILeadService interface {
 	UpdateLeadStatus(ctx context.Context, leadID int, statusID int, refusalReason string, examDate *time.Time) error
 	UpdateLead(ctx context.Context, leadID int, req *model.UpdateLeadRequest) (*model.Lead, error)
 	DeleteLead(ctx context.Context, leadID int) error
+	CompleteReminder(ctx context.Context, leadID int) error
 	MergeLeads(ctx context.Context, targetLeadID, sourceLeadID int) error
 	ImportLeads(ctx context.Context, r io.Reader) error
 	ImportLeadsRich(ctx context.Context, r io.Reader,

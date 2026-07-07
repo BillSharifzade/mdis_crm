@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Search, Download, Plus, Eye, Phone, MessageCircle, ChevronLeft, ChevronRight, Upload, GitMerge, Trash2, X } from 'lucide-react';
-import { STATUSES, SOURCES, getStatusObj, formatDate } from '../data/crmData';
+import { STATUSES, SOURCES, getStatusObj, formatDate, paymentStatusLabel } from '../data/crmData';
 import { api } from '../services/api';
 import TelegramChatModal from '../components/TelegramChatModal';
 import CallModal from '../components/CallModal';
@@ -187,6 +187,7 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
                             <th>Программа</th>
                             <th>Источник</th>
                             <th>Статус</th>
+                            <th>Статус оплаты</th>
                             <th>Менеджер</th>
                             <th>Дата</th>
                             <th>Действия</th>
@@ -194,7 +195,7 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
                     </thead>
                     <tbody>
                         {slice.length === 0 && (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Ничего не найдено</td></tr>
+                            <tr><td colSpan="9" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Ничего не найдено</td></tr>
                         )}
                         {slice.map(l => {
                             const st = getStatusObj(l.status);
@@ -216,6 +217,11 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
                                     <td style={{ color: 'var(--text-secondary)' }}>{l.program}</td>
                                     <td><span className="source-chip">{l.source}</span></td>
                                     <td><span className={`status-badge ${st.cls}`}>{st.label}</span></td>
+                                    <td>
+                                        {l.paymentStatus
+                                            ? <span className="source-chip">{paymentStatusLabel(l.paymentStatus)}</span>
+                                            : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                                    </td>
                                     <td>
                                         {(() => {
                                             const u = usersById.get(l.assigneeId);

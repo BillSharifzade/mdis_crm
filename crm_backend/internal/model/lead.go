@@ -24,8 +24,17 @@ type Lead struct {
 	SocialURL    string    `json:"social_url,omitempty"`
 	EnglishLevel string    `json:"english_level,omitempty"`
 	ProgramName  string    `json:"program_name,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	// Способ оплаты (не этап воронки): "" | "self_payment" | "sponsorship".
+	PaymentStatus string     `json:"payment_status,omitempty"`
+	ReminderAt    *time.Time `json:"reminder_at,omitempty"`
+	ReminderNote  string     `json:"reminder_note,omitempty"`
+	ReminderDone  bool       `json:"reminder_done"`
+	// Доп. поля для программы MBA — место работы.
+	WorkCompany  string     `json:"work_company,omitempty"`
+	WorkPosition string     `json:"work_position,omitempty"`
+	EnrolledAt   *time.Time `json:"enrolled_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
 type Program struct {
@@ -52,6 +61,11 @@ type CreateLeadRequest struct {
 	SocialURL    string     `json:"social_url,omitempty"`
 	EnglishLevel string     `json:"english_level,omitempty"`
 	AssigneeID   *int       `json:"assignee_id,omitempty"`
+	PaymentStatus string    `json:"payment_status,omitempty"`
+	ReminderAt   *time.Time `json:"reminder_at,omitempty"`
+	ReminderNote string     `json:"reminder_note,omitempty"`
+	WorkCompany  string     `json:"work_company,omitempty"`
+	WorkPosition string     `json:"work_position,omitempty"`
 	CreatedAt    *time.Time `json:"created_at,omitempty"`
 }
 
@@ -65,6 +79,12 @@ type UpdateLeadRequest struct {
 	UTMSource    string  `json:"utm_source,omitempty"`
 	SocialURL    *string `json:"social_url,omitempty"`
 	EnglishLevel *string `json:"english_level,omitempty"`
+	PaymentStatus *string    `json:"payment_status,omitempty"`
+	ReminderAt    *time.Time `json:"reminder_at,omitempty"`
+	ReminderNote  *string    `json:"reminder_note,omitempty"`
+	ClearReminder bool       `json:"clear_reminder,omitempty"`
+	WorkCompany   *string    `json:"work_company,omitempty"`
+	WorkPosition  *string    `json:"work_position,omitempty"`
 	ContactID    *int    `json:"-"`
 }
 

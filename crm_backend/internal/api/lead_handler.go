@@ -29,6 +29,7 @@ func (h *LeadHandler) Routes() chi.Router {
 	r.Put("/{id}", h.updateLead)
 	r.Delete("/{id}", h.deleteLead)
 	r.Patch("/{id}/status", h.updateLeadStatus)
+	r.Post("/{id}/reminder/complete", h.completeReminder)
 	r.Post("/merge", h.mergeLeads)
 	r.Post("/import", h.importLeads)
 	return r
@@ -198,6 +199,29 @@ func (h *LeadHandler) updateLeadStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// completeReminder godoc
+// @Summary Mark a lead's follow-up reminder as done
+// @Description Closes the calendar reminder so it stops appearing in notifications.
+// @Tags leads
+// @Param id path int true "Lead ID"
+// @Success 204 "No Content"
+// @Security Bearer
+// @Router /leads/{id}/reminder/complete [post]
+func (h *LeadHandler) completeReminder(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid lead ID"})
+		return
+	}
+	if err := h.svc.CompleteReminder(r.Context(), id); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to complete reminder"})
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

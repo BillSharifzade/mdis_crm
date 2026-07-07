@@ -70,6 +70,8 @@ func (r *Router) InitRoutes() http.Handler {
 	notificationSvc := service.NewNotificationService()
 	authSvc := service.NewAuthService(userRepo)
 	leadSvc := service.NewLeadService(leadRepo, contactRepo, dealRepo, userRepo, notificationSvc, statusHistoryRepo, eventBus)
+	// Планировщик напоминаний (#3): раз в минуту шлёт reminder.due по SSE.
+	leadSvc.StartReminderScheduler(context.Background())
 	interactionSvc := service.NewInteractionService(interactionRepo, eventBus)
 	analyticsSvc := service.NewAnalyticsService(analyticsRepo)
 	botSvc := service.NewTelegramBotService(r.telegramBotToken, tgChatRepo, leadSvc, interactionSvc, contactRepo, leadRepo, programRepo, settingsRepo, settingsRepo, botSettingsRepo, eventBus)

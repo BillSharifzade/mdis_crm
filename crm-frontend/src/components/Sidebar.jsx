@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Kanban, BarChart2, FileText, Settings, LogOut, Sun, Moon, Target } from 'lucide-react';
+import { LayoutDashboard, Users, Kanban, BarChart2, FileText, Settings, LogOut, Sun, Moon, Target, GraduationCap } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { getInitials } from '../data/crmData';
 
@@ -15,6 +15,11 @@ const navItems = [
             { id: 'analytics', icon: BarChart2, label: 'Аналитика' },
             { id: 'reports', icon: FileText, label: 'Отчёты' },
             { id: 'mykpi', icon: Target, label: 'Мой KPI' },
+        ]
+    },
+    {
+        section: 'Студенты', items: [
+            { id: 'archive', icon: GraduationCap, label: 'Архив зачисленных' },
         ]
     },
     {

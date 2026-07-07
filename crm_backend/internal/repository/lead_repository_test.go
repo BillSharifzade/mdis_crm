@@ -26,8 +26,8 @@ func TestLeadRepository_GetByID(t *testing.T) {
 	statusID := 1
 	contactID := 2
 
-	rows := pgxmock.NewRows([]string{"id", "first_name", "last_name", "email", "phone", "source_id", "program_id", "status_id", "assignee_id", "contact_id", "utm_source", "utm_medium", "utm_campaign", "telegram_id", "whatsapp_id", "vk_id", "created_at", "updated_at"}).
-		AddRow(1, "John", "Doe", "john@doe.com", "123", (*int)(nil), (*int)(nil), &statusID, (*int)(nil), &contactID, "source", "medium", "campaign", "tg123", "", "", time.Now(), time.Now())
+	rows := pgxmock.NewRows([]string{"id", "first_name", "last_name", "email", "phone", "source_id", "program_id", "status_id", "assignee_id", "contact_id", "utm_source", "utm_medium", "utm_campaign", "telegram_id", "whatsapp_id", "vk_id", "social_url", "english_level", "program_name", "payment_status", "reminder_at", "reminder_note", "reminder_done", "work_company", "work_position", "enrolled_at", "created_at", "updated_at"}).
+		AddRow(1, "John", "Doe", "john@doe.com", "123", (*int)(nil), (*int)(nil), &statusID, (*int)(nil), &contactID, "source", "medium", "campaign", "tg123", "", "", "", "", "", "", (*time.Time)(nil), "", false, "", "", (*time.Time)(nil), time.Now(), time.Now())
 
 	mock.ExpectQuery("SELECT").WithArgs(1).WillReturnRows(rows)
 

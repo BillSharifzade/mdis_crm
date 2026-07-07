@@ -55,6 +55,7 @@ const SOURCE_LABELS = {
     site: 'Сайт', telegram: 'Telegram', whatsapp: 'WhatsApp',
     instagram: 'Instagram', vk: 'VK', email: 'Email',
     phone: 'Звонок', yandex_ads: 'Реклама Яндекс', organic: 'Сайт',
+    campus_visit: 'Кампус-визит',
 };
 
 export const mapServerToClientLead = (serverLead) => {
@@ -82,6 +83,13 @@ export const mapServerToClientLead = (serverLead) => {
         whatsappId: serverLead.whatsapp_id || '',
         vkId: serverLead.vk_id || '',
         socialUrl: serverLead.social_url || '',
+        paymentStatus: serverLead.payment_status || '',
+        reminderAt: serverLead.reminder_at || null,
+        reminderNote: serverLead.reminder_note || '',
+        reminderDone: !!serverLead.reminder_done,
+        workCompany: serverLead.work_company || '',
+        workPosition: serverLead.work_position || '',
+        enrolledAt: serverLead.enrolled_at || null,
     };
 };
 
@@ -236,6 +244,11 @@ export const api = {
         if (clientLeadData.socialUrl) serverPayload.social_url = clientLeadData.socialUrl;
         if (clientLeadData.englishLevel) serverPayload.english_level = clientLeadData.englishLevel;
         if (clientLeadData.assigneeId) serverPayload.assignee_id = clientLeadData.assigneeId;
+        if (clientLeadData.paymentStatus) serverPayload.payment_status = clientLeadData.paymentStatus;
+        if (clientLeadData.reminderAt) serverPayload.reminder_at = new Date(clientLeadData.reminderAt).toISOString();
+        if (clientLeadData.reminderNote) serverPayload.reminder_note = clientLeadData.reminderNote;
+        if (clientLeadData.workCompany) serverPayload.work_company = clientLeadData.workCompany;
+        if (clientLeadData.workPosition) serverPayload.work_position = clientLeadData.workPosition;
         const response = await fetchWithAuth(`/leads`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -257,6 +270,11 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
+        return await handleResponse(response);
+    },
+
+    completeReminder: async (id) => {
+        const response = await fetchWithAuth(`/leads/${id}/reminder/complete`, { method: 'POST' });
         return await handleResponse(response);
     },
 
@@ -299,6 +317,16 @@ export const api = {
         if (clientLead.programId != null) payload.program_id = clientLead.programId;
         if (clientLead.socialUrl !== undefined) payload.social_url = clientLead.socialUrl;
         if (clientLead.englishLevel !== undefined) payload.english_level = clientLead.englishLevel;
+        if (clientLead.paymentStatus !== undefined) payload.payment_status = clientLead.paymentStatus;
+        if (clientLead.workCompany !== undefined) payload.work_company = clientLead.workCompany;
+        if (clientLead.workPosition !== undefined) payload.work_position = clientLead.workPosition;
+        // Напоминание: очистка имеет приоритет над установкой.
+        if (clientLead.clearReminder) {
+            payload.clear_reminder = true;
+        } else if (clientLead.reminderAt) {
+            payload.reminder_at = new Date(clientLead.reminderAt).toISOString();
+            if (clientLead.reminderNote !== undefined) payload.reminder_note = clientLead.reminderNote;
+        }
         const response = await fetchWithAuth(`/leads/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
