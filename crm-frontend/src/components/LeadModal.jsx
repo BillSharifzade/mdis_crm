@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Save } from 'lucide-react';
 import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, PAYMENT_STATUSES, AVATAR_COLORS, randEl, getInitials, isMbaProgram } from '../data/crmData';
 import { useUsers } from '../context/useUsers';
 import { usePrograms } from '../context/usePrograms';
 import { useSources } from '../context/useSources';
+import { loadDraft, saveDraft, clearDraft, hasDraft } from '../services/draft';
+
+const DRAFT_KEY = 'crm_lead_draft_new';
 
 export default function LeadModal({ onClose, onSave, showToast }) {
     const { users } = useUsers();
@@ -15,7 +18,9 @@ export default function LeadModal({ onClose, onSave, showToast }) {
         ? programs.map(p => ({ id: p.id, name: p.name }))
         : PROGRAMS.map((name, i) => ({ id: -1 - i, name }));
 
-    const [form, setForm] = useState({
+    // Черновик: если пользователь случайно закрыл окно, при повторном открытии
+    // данные восстанавливаются из localStorage. Чистится только при сохранении.
+    const [form, setForm] = useState(() => loadDraft(DRAFT_KEY, {
         fio: '', phone: '', email: '',
         source: 'Сайт',
         programId: programOptions[0]?.id ?? null,
@@ -29,7 +34,26 @@ export default function LeadModal({ onClose, onSave, showToast }) {
         reminderAt: '',
         reminderNote: '',
         comment: ''
-    });
+    }));
+
+    // Одноразовое уведомление, что черновик восстановлен (только если он был).
+    const draftNotified = useRef(false);
+    useEffect(() => {
+        if (!draftNotified.current && hasDraft(DRAFT_KEY)) {
+            draftNotified.current = true;
+            showToast && showToast('Восстановлен черновик лида', 'info');
+        }
+    }, [showToast]);
+
+    // Черновик пишем только если реально что-то введено — иначе пустая форма
+    // сама себя сохраняла бы и при следующем открытии ложно рапортовала о
+    // «восстановлении». Пустую форму, наоборот, вычищаем.
+    useEffect(() => {
+        const filled = !!(form.fio || form.phone || form.email || form.socialUrl ||
+            form.comment || form.workCompany || form.workPosition || form.reminderAt ||
+            form.reminderNote || form.englishSystem || form.englishScore || form.paymentStatus);
+        if (filled) saveDraft(DRAFT_KEY, form); else clearDraft(DRAFT_KEY);
+    }, [form]);
 
     const selectedProgramName = programOptions.find(p => p.id === form.programId)?.name || '';
     const showMba = isMbaProgram(selectedProgramName);
@@ -38,7 +62,7 @@ export default function LeadModal({ onClose, onSave, showToast }) {
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!form.fio || !form.phone) {
             showToast('Заполните обязательные поля', 'warning');
             return;
@@ -52,7 +76,7 @@ export default function LeadModal({ onClose, onSave, showToast }) {
         const englishLevel = form.englishSystem && form.englishScore
             ? `${form.englishSystem} ${form.englishScore}`
             : '';
-        onSave({
+        const ok = await onSave({
             name: form.fio,
             initials: getInitials(form.fio),
             phone: form.phone,
@@ -75,7 +99,12 @@ export default function LeadModal({ onClose, onSave, showToast }) {
             color: randEl(AVATAR_COLORS),
             interactions: [],
         });
-        onClose();
+        // Черновик чистим и закрываем только при успехе — если сохранение
+        // сорвалось (сеть/сервер), данные остаются в форме и в черновике.
+        if (ok !== false) {
+            clearDraft(DRAFT_KEY);
+            onClose();
+        }
     };
 
     return (

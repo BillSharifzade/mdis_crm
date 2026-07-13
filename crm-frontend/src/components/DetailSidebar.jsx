@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Phone, MessageCircle, Mail, Pencil, Plus, Send, Trash2, Save, Link as LinkIcon } from 'lucide-react';
 import { SOURCES, PROGRAMS, ENGLISH_SYSTEMS, PAYMENT_STATUSES, getStatusObj, formatHoursAgo, paymentStatusLabel, isMbaProgram } from '../data/crmData';
 import { api, statusIdToKey } from '../services/api';
@@ -8,6 +8,7 @@ import { useUsers } from '../context/useUsers';
 import { usePrograms } from '../context/usePrograms';
 import { useStages } from '../context/useStages';
 import { useSources } from '../context/useSources';
+import { loadDraft, saveDraft, clearDraft, hasDraft } from '../services/draft';
 
 const iconMap = {
     'phone': Phone,
@@ -402,10 +403,12 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
                     lead={lead}
                     users={users}
                     programs={programs}
+                    showToast={showToast}
                     onClose={() => setEditing(false)}
                     onSave={async (patch) => {
                         const ok = await onUpdate(lead.id, patch);
                         if (ok) setEditing(false);
+                        return ok;
                     }}
                 />
             )}
@@ -413,8 +416,9 @@ export default function DetailSidebar({ lead, onClose, onStatusChange, onUpdate,
     );
 }
 
-function EditLeadModal({ lead, users, programs, onClose, onSave }) {
+function EditLeadModal({ lead, users, programs, showToast, onClose, onSave }) {
     const { options: sourceOptions } = useSources();
+    const draftKey = `crm_lead_draft_edit_${lead.id}`;
     const eligibleManagers = users.filter(u => u.role === 'admin' || u.role === 'admissions');
     const programOptions = programs && programs.length > 0
         ? programs.map(p => ({ id: p.id, name: p.name }))
@@ -429,7 +433,8 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
     const initialEnglishSystem = ENGLISH_SYSTEMS[engSys0] ? engSys0 : '';
     const initialEnglishScore = initialEnglishSystem ? engRest.join(' ') : '';
 
-    const [form, setForm] = useState({
+    // Базовое (незаполненное правками) состояние формы — из данных лида.
+    const baseForm = {
         name: lead.name || '',
         phone: lead.phone || '',
         email: lead.email || '',
@@ -444,8 +449,27 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
         workPosition: lead.workPosition || '',
         reminderAt: toLocalInput(lead.reminderDone ? '' : lead.reminderAt),
         reminderNote: lead.reminderDone ? '' : (lead.reminderNote || ''),
-    });
+    };
+    const baseJson = JSON.stringify(baseForm);
+
+    // Черновик правок лида: случайно закрытая карточка не теряет введённое.
+    const [form, setForm] = useState(() => loadDraft(draftKey, baseForm));
     const [busy, setBusy] = useState(false);
+
+    const draftNotified = useRef(false);
+    useEffect(() => {
+        if (!draftNotified.current && hasDraft(draftKey)) {
+            draftNotified.current = true;
+            showToast && showToast('Восстановлен черновик правок', 'info');
+        }
+    }, [draftKey, showToast]);
+
+    // Пишем черновик только если форма отличается от исходных данных лида;
+    // если правок нет — вычищаем, чтобы не оставлять ложный «черновик».
+    useEffect(() => {
+        if (JSON.stringify(form) !== baseJson) saveDraft(draftKey, form);
+        else clearDraft(draftKey);
+    }, [draftKey, form, baseJson]);
     const editProgramName = programOptions.find(p => p.id === form.programId)?.name || '';
     const showMba = isMbaProgram(editProgramName);
     const hadReminder = !!lead.reminderAt && !lead.reminderDone;
@@ -480,7 +504,8 @@ function EditLeadModal({ lead, users, programs, onClose, onSave }) {
             patch.reminderAt = form.reminderAt;
             patch.reminderNote = form.reminderNote.trim();
         }
-        await onSave(patch);
+        const ok = await onSave(patch);
+        if (ok !== false) clearDraft(draftKey); // успех — черновик правок больше не нужен
         setBusy(false);
     };
 
