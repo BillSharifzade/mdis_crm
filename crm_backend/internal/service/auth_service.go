@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"crm_backend/internal/model"
@@ -11,6 +12,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// tokenTTL — время жизни JWT. По умолчанию 1 неделя (168 часов); можно
+// переопределить через env JWT_TTL_HOURS.
+func tokenTTL() time.Duration {
+	if v := os.Getenv("JWT_TTL_HOURS"); v != "" {
+		if h, err := strconv.Atoi(v); err == nil && h > 0 {
+			return time.Duration(h) * time.Hour
+		}
+	}
+	return time.Hour * 24 * 7
+}
 
 type AuthService struct {
 	repo UserRepository
@@ -41,7 +53,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*model
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"role":    user.Role,
-		"exp":     time.Now().Add(time.Hour * 72).Unix(),
+		"exp":     time.Now().Add(tokenTTL()).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

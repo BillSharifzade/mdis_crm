@@ -154,6 +154,12 @@ const getAuthHeaders = () => {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
+// Колбэк, который дёргается при 401 по УЖЕ авторизованному запросу (протухший
+// токен). App регистрирует сюда обработчик, чтобы автоматически показать экран
+// входа без ручного logout. Не срабатывает при неудачном логине (токена не было).
+let unauthorizedHandler = null;
+export const setUnauthorizedHandler = (fn) => { unauthorizedHandler = fn; };
+
 // Обёртка над fetch: сетевые/транспортные сбои превращаем в ApiError(0, ...),
 // чтобы наверх ВСЕГДА уходила ошибка с кодом и описанием — никаких тихих фолбэков.
 const safeFetch = async (url, options) => {
@@ -172,8 +178,12 @@ const fetchWithAuth = async (endpoint, options = {}) => {
 const handleResponse = async (response) => {
     if (!response.ok) {
         if (response.status === 401) {
+            // Токен был → значит сессия протухла (а не провал логина). Чистим и
+            // уводим на экран входа автоматически.
+            const hadToken = !!localStorage.getItem('crm_token');
             localStorage.removeItem('crm_token');
             localStorage.removeItem('crm_user');
+            if (hadToken && unauthorizedHandler) unauthorizedHandler();
         }
         let body = '';
         try { body = (await response.text()).trim(); } catch { /* ignore */ }

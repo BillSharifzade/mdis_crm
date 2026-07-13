@@ -6,6 +6,7 @@ import TelegramChatModal from '../components/TelegramChatModal';
 import CallModal from '../components/CallModal';
 import { useUsers } from '../context/useUsers';
 import { useSources } from '../context/useSources';
+import { usePrograms } from '../context/usePrograms';
 
 const PAGE_SIZE = 12;
 
@@ -14,6 +15,7 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
     const canManage = role === 'admin' || role === 'admissions';
     const { users, byId: usersById } = useUsers();
     const { options: sourceOptions } = useSources();
+    const { programs } = usePrograms();
     // Гостей нельзя назначать менеджерами — исключаем из фильтра.
     // Никаких выдуманных «запасных» менеджеров: показываем только реальных.
     const managerOptions = users.filter(u => u.role === 'admin' || u.role === 'admissions');
@@ -21,11 +23,25 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
     const [filterStatus, setFilterStatus] = useState('');
     const [filterSource, setFilterSource] = useState('');
     const [filterManager, setFilterManager] = useState('');
+    const [filterProgram, setFilterProgram] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [selected, setSelected] = useState(new Set());
     const [chatLead, setChatLead] = useState(null);
     const [callLead, setCallLead] = useState(null);
     const search = externalSearch || '';
+
+    // Опции фильтра по программе строим из НАЗВАНИЙ, реально встречающихся у
+    // лидов (l.program = program_name), а не из справочника программ: часть
+    // лидов хранит свободный/легаси-текст («Бизнес-администрирование»), которого
+    // нет в таблице programs, поэтому фильтр по справочнику давал бы 0 совпадений.
+    // Справочник добавляем сверху — вдруг менеджер захочет выбрать программу,
+    // по которой лидов пока нет.
+    const programOptions = useMemo(() => {
+        const set = new Set();
+        allLeads.forEach(l => { if (l.program && l.program !== '—') set.add(l.program); });
+        (programs || []).forEach(p => { if (p.name) set.add(p.name); });
+        return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+    }, [programs, allLeads]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -38,13 +54,14 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
             }
             if (filterStatus && getStatusObj(l.status).label !== filterStatus) return false;
             if (filterSource && l.source !== filterSource) return false;
+            if (filterProgram && l.program !== filterProgram) return false;
             if (filterManager) {
                 const realName = usersById.get(l.assigneeId)?.name;
                 if (realName !== filterManager) return false;
             }
             return true;
         });
-    }, [allLeads, search, filterStatus, filterSource, filterManager, usersById]);
+    }, [allLeads, search, filterStatus, filterSource, filterProgram, filterManager, usersById]);
 
     const pages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
     const safePage = Math.min(currentPage, pages);
@@ -78,6 +95,7 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
     const clearFilters = () => {
         setFilterStatus('');
         setFilterSource('');
+        setFilterProgram('');
         setFilterManager('');
         setCurrentPage(1);
         onExternalSearchChange && onExternalSearchChange('');
@@ -114,7 +132,7 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
         }
     };
 
-    const hasFilters = !!(search || filterStatus || filterSource || filterManager);
+    const hasFilters = !!(search || filterStatus || filterSource || filterProgram || filterManager);
 
     return (
         <section className="page active">
@@ -149,6 +167,10 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
                 <select className="filter-select" value={filterSource} onChange={e => { setFilterSource(e.target.value); setCurrentPage(1); }}>
                     <option value="">Все источники</option>
                     {(sourceOptions.length ? sourceOptions.map(o => o.label) : SOURCES).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select className="filter-select" value={filterProgram} onChange={e => { setFilterProgram(e.target.value); setCurrentPage(1); }}>
+                    <option value="">Все программы</option>
+                    {programOptions.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
                 <select className="filter-select" value={filterManager} onChange={e => { setFilterManager(e.target.value); setCurrentPage(1); }}>
                     <option value="">Все менеджеры</option>

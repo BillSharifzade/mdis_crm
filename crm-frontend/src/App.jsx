@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Dashboard from './pages/Dashboard';
@@ -16,7 +16,7 @@ import DetailSidebar from './components/DetailSidebar';
 import NotifPanel from './components/NotifPanel';
 import ToastContainer from './components/ToastContainer';
 import Login from './pages/Login';
-import { api, mapServerToClientLead, mapServerToClientInteraction, statusIdToKey } from './services/api';
+import { api, mapServerToClientLead, mapServerToClientInteraction, statusIdToKey, setUnauthorizedHandler } from './services/api';
 import { useNotif } from './context/useNotif';
 import { UsersProvider } from './context/UsersContext';
 import { ProgramsProvider } from './context/ProgramsContext';
@@ -122,6 +122,23 @@ function App() {
   }, [isAuthenticated]);
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
+
+  // Авто-выход при протухшем токене (401): вместо ручного logout/login просто
+  // возвращаем пользователя на экран входа с тостом. Флаг предотвращает спам
+  // тостами, когда 401 прилетает сразу по нескольким параллельным запросам.
+  const sessionExpiredRef = useRef(false);
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (sessionExpiredRef.current) return;
+      sessionExpiredRef.current = true;
+      setIsAuthenticated(false);
+      setUser(null);
+      setAllLeads([]);
+      setCurrentPage('dashboard');
+      showToast('Сессия истекла — войдите снова', 'warning');
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [showToast]);
 
   // Тост-сводка KPI при входе для роли admissions.
   useEffect(() => {
@@ -422,6 +439,7 @@ function App() {
   };
 
   const handleLoginSuccess = useCallback(() => {
+    sessionExpiredRef.current = false;
     setIsAuthenticated(true);
     setUser(api.currentUser());
     pushNotif({ type: 'user_action', text: '<strong>Вход</strong> в систему' });
