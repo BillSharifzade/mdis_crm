@@ -523,6 +523,18 @@
     box-shadow: 0 0 16px rgba(124, 58, 237, 0.4)
 }
 
+.page-ellipsis {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    user-select: none
+}
+
 /* ─── KANBAN ─── */
 .kanban-board {
     display: flex;

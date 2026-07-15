@@ -10,6 +10,20 @@ import { usePrograms } from '../context/usePrograms';
 
 const PAGE_SIZE = 12;
 
+// Windowed page list: always show first & last, a window around the current
+// page, and '…' gaps for the rest. e.g. [1, '…', 4, 5, 6, '…', 20]
+function getPageItems(current, total) {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const items = [1];
+    const left = Math.max(2, current - 1);
+    const right = Math.min(total - 1, current + 1);
+    if (left > 2) items.push('…');
+    for (let p = left; p <= right; p++) items.push(p);
+    if (right < total - 1) items.push('…');
+    items.push(total);
+    return items;
+}
+
 export default function Leads({ allLeads, openDetail, openModal, openImport, openMerge, role, showToast, externalSearch = '', onExternalSearchChange, onStatusChange, unreadByLead = {} }) {
     const canEdit = role !== 'guest';
     const canManage = role === 'admin' || role === 'admissions';
@@ -291,8 +305,10 @@ export default function Leads({ allLeads, openDetail, openModal, openImport, ope
                         <div className="pagination-btns">
                             <button className="page-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))}><ChevronLeft size={13} /></button>
                             <div className="page-numbers">
-                                {Array.from({ length: Math.min(pages, 7) }, (_, i) => i + 1).map(p => (
-                                    <button key={p} className={`page-number-btn ${p === safePage ? 'active' : ''}`} onClick={() => setCurrentPage(p)}>{p}</button>
+                                {getPageItems(safePage, pages).map((p, i) => (
+                                    p === '…'
+                                        ? <span key={`gap-${i}`} className="page-ellipsis">…</span>
+                                        : <button key={p} className={`page-number-btn ${p === safePage ? 'active' : ''}`} onClick={() => setCurrentPage(p)}>{p}</button>
                                 ))}
                             </div>
                             <button className="page-btn" onClick={() => setCurrentPage(p => Math.min(pages, p + 1))}><ChevronRight size={13} /></button>
